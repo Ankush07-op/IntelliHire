@@ -1,25 +1,42 @@
-import { Routes, Route } from "react-router-dom";
-import { Box, Typography } from "@mui/material";
+import { Routes, Route, Navigate } from "react-router-dom";
 
-function Home() {
-  return (
-    <Box sx={{ p: 4 }}>
-      <Typography variant="h4">
-        IntelliHire Recruiter Portal
-      </Typography>
+import MainLayout from "./components/layout/MainLayout";
 
-      <Typography variant="body1" sx={{ mt: 2 }}>
-        Recruiter frontend setup completed.
-      </Typography>
-    </Box>
-  );
-}
+import Dashboard from "./pages/dashboard/Dashboard";
+import Jobs from "./pages/jobs/Jobs";
+import Applications from "./pages/applications/Applications";
+import Ranking from "./pages/ranking/Ranking";
 
 function App() {
   return (
-    <Routes>
-      <Route path="/" element={<Home />} />
-    </Routes>
+    <MainLayout>
+      <Routes>
+        <Route
+          path="/"
+          element={<Navigate to="/dashboard" replace />}
+        />
+
+        <Route
+          path="/dashboard"
+          element={<Dashboard />}
+        />
+
+        <Route
+          path="/jobs"
+          element={<Jobs />}
+        />
+
+        <Route
+          path="/applications"
+          element={<Applications />}
+        />
+
+        <Route
+          path="/ranking"
+          element={<Ranking />}
+        />
+      </Routes>
+    </MainLayout>
   );
 }
 
