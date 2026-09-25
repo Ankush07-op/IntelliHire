@@ -12,7 +12,8 @@ if (dns.setDefaultResultOrder) {
 
 // Route imports
 const authRoutes = require('./src/routes/authRoutes');
-const jobRoutes = require('./routes/jobRoutes');
+const jobRoutes = require('./src/routes/jobRoutes');
+const applicationRoutes = require('./src/routes/applicationRoutes');
 
 const app = express();
 
@@ -23,6 +24,7 @@ app.use(express.json());
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/jobs', jobRoutes);
+app.use('/api/applications', applicationRoutes);
 
 // Database Connection
 mongoose.connect(process.env.MONGO_URI)
