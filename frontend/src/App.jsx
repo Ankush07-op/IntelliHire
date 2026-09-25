@@ -10,21 +10,25 @@ import Ranking from "./pages/ranking/Ranking";
 import RecruiterLogin from "./pages/auth/RecruiterLogin";
 import RecruiterRegister from "./pages/auth/RecruiterRegister";
 
+import ProtectedRoute from "./routes/ProtectedRoute";
+
 function App() {
   return (
     <Routes>
-      {/* Authentication Routes */}
+      {/* Public Authentication Routes */}
       <Route path="/login" element={<RecruiterLogin />} />
       <Route path="/register" element={<RecruiterRegister />} />
 
-      {/* Recruiter Portal */}
-      <Route path="/" element={<MainLayout />}>
-        <Route index element={<Navigate to="/dashboard" replace />} />
+      {/* Protected Recruiter Routes */}
+      <Route element={<ProtectedRoute />}>
+        <Route path="/" element={<MainLayout />}>
+          <Route index element={<Navigate to="/dashboard" replace />} />
 
-        <Route path="dashboard" element={<Dashboard />} />
-        <Route path="jobs" element={<Jobs />} />
-        <Route path="applications" element={<Applications />} />
-        <Route path="ranking" element={<Ranking />} />
+          <Route path="dashboard" element={<Dashboard />} />
+          <Route path="jobs" element={<Jobs />} />
+          <Route path="applications" element={<Applications />} />
+          <Route path="ranking" element={<Ranking />} />
+        </Route>
       </Route>
     </Routes>
   );

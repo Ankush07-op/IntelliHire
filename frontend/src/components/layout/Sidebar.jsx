@@ -13,12 +13,15 @@ import WorkIcon from "@mui/icons-material/Work";
 import PeopleIcon from "@mui/icons-material/People";
 import BarChartIcon from "@mui/icons-material/BarChart";
 import LoginIcon from "@mui/icons-material/Login";
+import LogoutIcon from "@mui/icons-material/Logout";
 
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 const drawerWidth = 240;
 
 function Sidebar() {
+  const navigate = useNavigate();
+
   const menuItems = [
     {
       text: "Dashboard",
@@ -41,6 +44,11 @@ function Sidebar() {
       path: "/ranking",
     },
   ];
+
+  const handleLogout = () => {
+    localStorage.removeItem("isRecruiterLoggedIn");
+    navigate("/login", { replace: true });
+  };
 
   return (
     <Drawer
@@ -83,6 +91,17 @@ function Sidebar() {
               </ListItemIcon>
 
               <ListItemText primary="Login" />
+            </ListItemButton>
+          </ListItem>
+
+          {/* Logout */}
+          <ListItem disablePadding>
+            <ListItemButton onClick={handleLogout}>
+              <ListItemIcon>
+                <LogoutIcon />
+              </ListItemIcon>
+
+              <ListItemText primary="Logout" />
             </ListItemButton>
           </ListItem>
         </List>
