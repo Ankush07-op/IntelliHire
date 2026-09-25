@@ -1,43 +1,44 @@
 import {
   Drawer,
   List,
+  ListItem,
   ListItemButton,
   ListItemIcon,
   ListItemText,
-  Toolbar,
   Box,
 } from "@mui/material";
 
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import WorkIcon from "@mui/icons-material/Work";
 import PeopleIcon from "@mui/icons-material/People";
-import LeaderboardIcon from "@mui/icons-material/Leaderboard";
+import BarChartIcon from "@mui/icons-material/BarChart";
+import LoginIcon from "@mui/icons-material/Login";
 
-import { NavLink } from "react-router-dom";
+import { Link } from "react-router-dom";
 
 const drawerWidth = 240;
 
 function Sidebar() {
   const menuItems = [
     {
-      label: "Dashboard",
-      path: "/dashboard",
+      text: "Dashboard",
       icon: <DashboardIcon />,
+      path: "/dashboard",
     },
     {
-      label: "Jobs",
-      path: "/jobs",
+      text: "Jobs",
       icon: <WorkIcon />,
+      path: "/jobs",
     },
     {
-      label: "Applications",
-      path: "/applications",
+      text: "Applications",
       icon: <PeopleIcon />,
+      path: "/applications",
     },
     {
-      label: "Ranking",
+      text: "Ranking",
+      icon: <BarChartIcon />,
       path: "/ranking",
-      icon: <LeaderboardIcon />,
     },
   ];
 
@@ -47,35 +48,43 @@ function Sidebar() {
       sx={{
         width: drawerWidth,
         flexShrink: 0,
-
         "& .MuiDrawer-paper": {
           width: drawerWidth,
           boxSizing: "border-box",
+          top: "64px",
         },
       }}
     >
-      <Toolbar />
-
-      <Box sx={{ overflow: "auto" }}>
+      <Box>
         <List>
           {menuItems.map((item) => (
+            <ListItem key={item.text} disablePadding>
+              <ListItemButton
+                component={Link}
+                to={item.path}
+              >
+                <ListItemIcon>
+                  {item.icon}
+                </ListItemIcon>
+
+                <ListItemText primary={item.text} />
+              </ListItemButton>
+            </ListItem>
+          ))}
+
+          {/* Login */}
+          <ListItem disablePadding>
             <ListItemButton
-              key={item.path}
-              component={NavLink}
-              to={item.path}
-              sx={{
-                "&.active": {
-                  backgroundColor: "action.selected",
-                },
-              }}
+              component={Link}
+              to="/login"
             >
               <ListItemIcon>
-                {item.icon}
+                <LoginIcon />
               </ListItemIcon>
 
-              <ListItemText primary={item.label} />
+              <ListItemText primary="Login" />
             </ListItemButton>
-          ))}
+          </ListItem>
         </List>
       </Box>
     </Drawer>

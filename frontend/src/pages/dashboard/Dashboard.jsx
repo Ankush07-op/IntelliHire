@@ -22,7 +22,7 @@ function Dashboard() {
       </Typography>
 
       <Grid container spacing={3}>
-        <Grid item xs={12} sm={6} md={4}>
+        <Grid xs={12} sm={6} md={4}>
           <Card>
             <CardContent>
               <Typography color="text.secondary">
@@ -36,7 +36,7 @@ function Dashboard() {
           </Card>
         </Grid>
 
-        <Grid item xs={12} sm={6} md={4}>
+        <Grid xs={12} sm={6} md={4}>
           <Card>
             <CardContent>
               <Typography color="text.secondary">
@@ -50,7 +50,7 @@ function Dashboard() {
           </Card>
         </Grid>
 
-        <Grid item xs={12} sm={6} md={4}>
+        <Grid xs={12} sm={6} md={4}>
           <Card>
             <CardContent>
               <Typography color="text.secondary">
