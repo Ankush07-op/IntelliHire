@@ -11,43 +11,46 @@ import {
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { useAuth } from "../../context/AuthContext";
+
 function RecruiterLogin() {
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
   const handleSubmit = (event) => {
-  event.preventDefault();
+    event.preventDefault();
 
-  setError("");
+    setError("");
 
-  const savedAccount = localStorage.getItem("recruiterAccount");
+    const savedAccount = localStorage.getItem("recruiterAccount");
 
-  if (!savedAccount) {
-    setError("No recruiter account found. Please register first.");
-    return;
-  }
+    if (!savedAccount) {
+      setError("No recruiter account found. Please register first.");
+      return;
+    }
 
-  const recruiter = JSON.parse(savedAccount);
+    const recruiter = JSON.parse(savedAccount);
 
-  const enteredEmail = email.trim().toLowerCase();
+    const enteredEmail = email.trim().toLowerCase();
 
-  if (
-    enteredEmail !== recruiter.email ||
-    password !== recruiter.password
-  ) {
-    setError("Invalid email or password.");
-    return;
-  }
+    if (
+      enteredEmail !== recruiter.email ||
+      password !== recruiter.password
+    ) {
+      setError("Invalid email or password.");
+      return;
+    }
 
-  localStorage.setItem("isRecruiterLoggedIn", "true");
+    login(recruiter);
 
-  alert("Login successful!");
+    alert("Login successful!");
 
-  navigate("/dashboard", { replace: true });
-};
+    navigate("/dashboard", { replace: true });
+  };
 
   return (
     <Box
@@ -98,7 +101,7 @@ function RecruiterLogin() {
               label="Email"
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(event) => setEmail(event.target.value)}
               margin="normal"
               required
             />
@@ -108,7 +111,7 @@ function RecruiterLogin() {
               label="Password"
               type="password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(event) => setPassword(event.target.value)}
               margin="normal"
               required
             />

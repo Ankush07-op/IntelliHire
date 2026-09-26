@@ -6,6 +6,7 @@ import { ThemeProvider } from "@mui/material/styles";
 
 import App from "./App";
 import theme from "./theme/theme";
+import { AuthProvider } from "./context/AuthContext";
 import "./index.css";
 
 const queryClient = new QueryClient();
@@ -15,7 +16,9 @@ ReactDOM.createRoot(document.getElementById("root")).render(
     <ThemeProvider theme={theme}>
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
-          <App />
+          <AuthProvider>
+            <App />
+          </AuthProvider>
         </BrowserRouter>
       </QueryClientProvider>
     </ThemeProvider>

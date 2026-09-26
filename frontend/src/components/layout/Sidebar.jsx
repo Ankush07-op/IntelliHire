@@ -12,14 +12,15 @@ import DashboardIcon from "@mui/icons-material/Dashboard";
 import WorkIcon from "@mui/icons-material/Work";
 import PeopleIcon from "@mui/icons-material/People";
 import BarChartIcon from "@mui/icons-material/BarChart";
-import LoginIcon from "@mui/icons-material/Login";
 import LogoutIcon from "@mui/icons-material/Logout";
 
+import { useAuth } from "../../context/AuthContext";
 import { Link, useNavigate } from "react-router-dom";
 
 const drawerWidth = 240;
 
 function Sidebar() {
+  const { logout } = useAuth();
   const navigate = useNavigate();
 
   const menuItems = [
@@ -46,7 +47,7 @@ function Sidebar() {
   ];
 
   const handleLogout = () => {
-    localStorage.removeItem("isRecruiterLoggedIn");
+    logout();
     navigate("/login", { replace: true });
   };
 
@@ -79,20 +80,6 @@ function Sidebar() {
               </ListItemButton>
             </ListItem>
           ))}
-
-          {/* Login */}
-          <ListItem disablePadding>
-            <ListItemButton
-              component={Link}
-              to="/login"
-            >
-              <ListItemIcon>
-                <LoginIcon />
-              </ListItemIcon>
-
-              <ListItemText primary="Login" />
-            </ListItemButton>
-          </ListItem>
 
           {/* Logout */}
           <ListItem disablePadding>
