@@ -1,5 +1,6 @@
 const Application = require('../models/Application');
 const Job = require('../models/Job');
+const { triggerAIAnalysis } = require('../services/aiService');
 
 // @desc    Submit a new job application
 // @route   POST /api/applications
@@ -34,7 +35,19 @@ const applyForJob = async (req, res) => {
       resumeUrl,
     });
 
-    res.status(201).json(application);
+    // Trigger AI Analysis Asynchronously (Non-blocking)
+    triggerAIAnalysis(
+      application._id,
+      resumeUrl,
+      job.description,
+      job.requiredSkills
+    );
+
+    // Return response immediately to applicant
+    res.status(201).json({
+      message: 'Application submitted successfully. AI parsing in progress.',
+      application,
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
