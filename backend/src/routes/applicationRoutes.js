@@ -6,9 +6,10 @@ const {
   getMyApplications,
 } = require('../controllers/applicationController');
 const { protect, authorize } = require('../middlewares/authMiddleware');
+const { aiTriggerLimiter } = require('../middlewares/rateLimiter');
 
 // Applicant routes
-router.post('/', protect, authorize('applicant'), applyForJob);
+router.post('/', protect, authorize('applicant'), aiTriggerLimiter, applyForJob);
 router.get('/me', protect, authorize('applicant'), getMyApplications);
 
 // Recruiter route

@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 require('dotenv').config();
 const dns = require('dns');
+const { apiLimiter } = require('./middlewares/rateLimiter');
 
 // Fix for local ISP DNS SRV refusal issues (querySrv ECONNREFUSED)
 dns.setServers(['8.8.8.8', '1.1.1.1']);
@@ -20,6 +21,9 @@ const app = express();
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// Apply general rate limiting to all API routes
+app.use('/api', apiLimiter);
 
 // API Routes
 app.use('/api/auth', authRoutes);
