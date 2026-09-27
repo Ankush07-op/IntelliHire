@@ -14,7 +14,16 @@ export function AuthProvider({ children }) {
   const [recruiter, setRecruiter] = useState(() => {
     const savedAccount = localStorage.getItem("recruiterAccount");
 
-    return savedAccount ? JSON.parse(savedAccount) : null;
+    if (!savedAccount) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(savedAccount);
+    } catch {
+      localStorage.removeItem("recruiterAccount");
+      return null;
+    }
   });
 
   const login = (account) => {
