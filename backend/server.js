@@ -15,6 +15,7 @@ if (dns.setDefaultResultOrder) {
 const authRoutes = require('./src/routes/authRoutes');
 const jobRoutes = require('./src/routes/jobRoutes');
 const applicationRoutes = require('./src/routes/applicationRoutes');
+const rankingRoutes = require('./src/routes/rankingRoutes');
 
 const app = express();
 
@@ -29,6 +30,7 @@ app.use('/api', apiLimiter);
 app.use('/api/auth', authRoutes);
 app.use('/api/jobs', jobRoutes);
 app.use('/api/applications', applicationRoutes);
+app.use('/api/rankings', rankingRoutes);
 
 // Database Connection
 mongoose.connect(process.env.MONGO_URI)

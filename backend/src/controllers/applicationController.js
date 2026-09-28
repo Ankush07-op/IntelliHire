@@ -1,6 +1,7 @@
 const Application = require('../models/Application');
 const Job = require('../models/Job');
 const { triggerAIAnalysis } = require('../services/aiService');
+const AIAnalysis = require('../models/AIAnalysis');
 
 // @desc    Submit a new job application
 // @route   POST /api/applications
@@ -95,8 +96,30 @@ const getMyApplications = async (req, res) => {
   }
 };
 
+// @desc    Get AI Analysis details for an application
+// @route   GET /api/applications/:id/analysis
+// @access  Private (Recruiter only)
+const getApplicationAnalysis = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const analysis = await AIAnalysis.findOne({ applicationId: id });
+
+    if (!analysis) {
+      return res.status(404).json({ 
+        message: 'AI analysis is still processing or unavailable for this application' 
+      });
+    }
+
+    res.json(analysis);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   applyForJob,
   getApplicationsByJob,
   getMyApplications,
+  getApplicationAnalysis,
 };

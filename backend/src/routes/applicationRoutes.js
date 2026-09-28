@@ -4,6 +4,7 @@ const {
   applyForJob,
   getApplicationsByJob,
   getMyApplications,
+  getApplicationAnalysis
 } = require('../controllers/applicationController');
 const { protect, authorize } = require('../middlewares/authMiddleware');
 const { aiTriggerLimiter } = require('../middlewares/rateLimiter');
@@ -14,5 +15,6 @@ router.get('/me', protect, authorize('applicant'), getMyApplications);
 
 // Recruiter route
 router.get('/job/:jobId', protect, authorize('recruiter'), getApplicationsByJob);
+router.get('/:id/analysis', protect, authorize('recruiter'), getApplicationAnalysis);
 
 module.exports = router;
