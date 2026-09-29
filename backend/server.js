@@ -1,9 +1,10 @@
 const express = require('express');
-const mongoose = require('mongoose');
+const connectDB = require('./src/config/db');
 const cors = require('cors');
 require('dotenv').config();
 const dns = require('dns');
-const { apiLimiter } = require('./middlewares/rateLimiter');
+const { errorHandler, notFound } = require('./src/middlewares/errorMiddleware');
+const { apiLimiter } = require('./src/middlewares/rateLimiter');
 
 // Fix for local ISP DNS SRV refusal issues (querySrv ECONNREFUSED)
 dns.setServers(['8.8.8.8', '1.1.1.1']);
@@ -19,11 +20,29 @@ const rankingRoutes = require('./src/routes/rankingRoutes');
 
 const app = express();
 
-// Middleware
-app.use(cors());
+// Connect to MongoDB
+connectDB();
+
+// CORS Configuration
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  'http://localhost:5173',
+].filter(Boolean);
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+}));
+
 app.use(express.json());
 
-// Apply general rate limiting to all API routes
+// Apply rate limiter
 app.use('/api', apiLimiter);
 
 // API Routes
@@ -32,15 +51,25 @@ app.use('/api/jobs', jobRoutes);
 app.use('/api/applications', applicationRoutes);
 app.use('/api/rankings', rankingRoutes);
 
-// Database Connection
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log('MongoDB connected successfully'))
-  .catch((err) => console.error('MongoDB connection error:', err));
-
 // Basic Route for testing
 app.get('/api/health', (req, res) => {
   res.status(200).json({ status: 'IntelliHire API is running' });
 });
 
+// Error Middlewares
+app.use(notFound);
+app.use(errorHandler);
+
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+const server = app.listen(PORT, () => console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`));
+
+// Graceful Shutdown
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received. Shutting down gracefully...');
+  server.close(() => {
+    mongoose.connection.close(false, () => {
+      console.log('MongoDB connection closed.');
+      process.exit(0);
+    });
+  });
+});
