@@ -5,6 +5,9 @@ require('dotenv').config();
 const dns = require('dns');
 const { errorHandler, notFound } = require('./src/middlewares/errorMiddleware');
 const { apiLimiter } = require('./src/middlewares/rateLimiter');
+const swaggerUi = require('swagger-ui-express');
+const YAML = require('yamljs');
+const swaggerDocument = YAML.load('./docs/swagger.yaml');
 
 // Fix for local ISP DNS SRV refusal issues (querySrv ECONNREFUSED)
 dns.setServers(['8.8.8.8', '1.1.1.1']);
@@ -50,6 +53,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/jobs', jobRoutes);
 app.use('/api/applications', applicationRoutes);
 app.use('/api/rankings', rankingRoutes);
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 // Basic Route for testing
 app.get('/api/health', (req, res) => {
