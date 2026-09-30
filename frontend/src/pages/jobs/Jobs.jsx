@@ -30,8 +30,10 @@ import { useState } from "react";
 function Jobs() {
   const [openDialog, setOpenDialog] = useState(false);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState("");
 
   const [jobs, setJobs] = useState([]);
+  const [editingJobId, setEditingJobId] = useState(null);
 
   const [job, setJob] = useState({
     title: "",
@@ -43,11 +45,23 @@ function Jobs() {
   });
 
   const handleOpenDialog = () => {
+    setEditingJobId(null);
+
+    setJob({
+      title: "",
+      department: "",
+      location: "",
+      employmentType: "",
+      description: "",
+      skills: "",
+    });
+
     setOpenDialog(true);
   };
 
   const handleCloseDialog = () => {
     setOpenDialog(false);
+    setEditingJobId(null);
   };
 
   const handleChange = (event) => {
@@ -71,6 +85,7 @@ function Jobs() {
     setJobs((previousJobs) => [...previousJobs, newJob]);
 
     setOpenDialog(false);
+    setSnackbarMessage("Job created successfully.");
     setSnackbarOpen(true);
 
     setJob({
@@ -81,6 +96,65 @@ function Jobs() {
       description: "",
       skills: "",
     });
+  };
+
+  const handleEditJob = (jobToEdit) => {
+    setJob({
+      title: jobToEdit.title,
+      department: jobToEdit.department,
+      location: jobToEdit.location,
+      employmentType: jobToEdit.employmentType,
+      description: jobToEdit.description,
+      skills: jobToEdit.skills,
+    });
+
+    setEditingJobId(jobToEdit.id);
+    setOpenDialog(true);
+  };
+
+  const handleUpdateJob = (event) => {
+    event.preventDefault();
+
+    setJobs((previousJobs) =>
+      previousJobs.map((item) =>
+        item.id === editingJobId
+          ? {
+              ...item,
+              ...job,
+            }
+          : item
+      )
+    );
+
+    setOpenDialog(false);
+    setEditingJobId(null);
+    setSnackbarMessage("Job updated successfully.");
+    setSnackbarOpen(true);
+
+    setJob({
+      title: "",
+      department: "",
+      location: "",
+      employmentType: "",
+      description: "",
+      skills: "",
+    });
+  };
+
+  const handleArchiveJob = (jobId) => {
+    setJobs((previousJobs) =>
+      previousJobs.map((item) =>
+        item.id === jobId
+          ? {
+              ...item,
+              status: "Archived",
+            }
+          : item
+      )
+    );
+
+    setSnackbarMessage("Job archived successfully.");
+    setSnackbarOpen(true);
   };
 
   const activeJobs = jobs.filter(
@@ -311,6 +385,36 @@ function Jobs() {
                     >
                       Skills: {item.skills}
                     </Typography>
+
+                    {/* Job Actions */}
+                    <Box
+                      sx={{
+                        display: "flex",
+                        gap: 1,
+                        mt: 3,
+                      }}
+                    >
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => handleEditJob(item)}
+                      >
+                        Edit
+                      </Button>
+
+                      {item.status === "Active" && (
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          color="warning"
+                          onClick={() =>
+                            handleArchiveJob(item.id)
+                          }
+                        >
+                          Archive
+                        </Button>
+                      )}
+                    </Box>
                   </CardContent>
                 </Card>
               </Grid>
@@ -319,15 +423,26 @@ function Jobs() {
         )}
       </Box>
 
-      {/* Create Job Dialog */}
+      {/* Create / Edit Job Dialog */}
       <Dialog
         open={openDialog}
         onClose={handleCloseDialog}
         fullWidth
         maxWidth="md"
       >
-        <Box component="form" onSubmit={handleCreateJob}>
-          <DialogTitle>Create New Job</DialogTitle>
+        <Box
+          component="form"
+          onSubmit={
+            editingJobId
+              ? handleUpdateJob
+              : handleCreateJob
+          }
+        >
+          <DialogTitle>
+            {editingJobId
+              ? "Edit Job"
+              : "Create New Job"}
+          </DialogTitle>
 
           <DialogContent dividers>
             <Grid container spacing={2} sx={{ pt: 1 }}>
@@ -367,7 +482,9 @@ function Jobs() {
 
               <Grid xs={12} sm={6}>
                 <FormControl fullWidth required>
-                  <InputLabel>Employment Type</InputLabel>
+                  <InputLabel>
+                    Employment Type
+                  </InputLabel>
 
                   <Select
                     label="Employment Type"
@@ -432,7 +549,9 @@ function Jobs() {
               variant="contained"
               startIcon={<AddIcon />}
             >
-              Create Job
+              {editingJobId
+                ? "Update Job"
+                : "Create Job"}
             </Button>
           </DialogActions>
         </Box>
@@ -448,7 +567,7 @@ function Jobs() {
           severity="success"
           onClose={() => setSnackbarOpen(false)}
         >
-          Job created successfully.
+          {snackbarMessage}
         </Alert>
       </Snackbar>
     </Box>
