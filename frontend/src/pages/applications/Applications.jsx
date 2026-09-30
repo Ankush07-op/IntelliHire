@@ -1,5 +1,6 @@
 import {
   Box,
+  Button,
   Card,
   CardContent,
   FormControl,
@@ -7,15 +8,75 @@ import {
   InputLabel,
   MenuItem,
   Select,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Chip,
   Typography,
+  Paper,
 } from "@mui/material";
 
 import PeopleIcon from "@mui/icons-material/People";
 import PendingActionsIcon from "@mui/icons-material/PendingActions";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
+import VisibilityIcon from "@mui/icons-material/Visibility";
 
 function Applications() {
+  const applications = [
+    {
+      id: 1,
+      candidate: "Rahul Sharma",
+      email: "rahul.sharma@gmail.com",
+      job: "Frontend Developer",
+      appliedDate: "30 Sep 2026",
+      status: "Applied",
+    },
+    {
+      id: 2,
+      candidate: "Priya Singh",
+      email: "priya.singh@gmail.com",
+      job: "Full Stack Developer",
+      appliedDate: "29 Sep 2026",
+      status: "Shortlisted",
+    },
+    {
+      id: 3,
+      candidate: "Amit Kumar",
+      email: "amit.kumar@gmail.com",
+      job: "Backend Developer",
+      appliedDate: "28 Sep 2026",
+      status: "Applied",
+    },
+    {
+      id: 4,
+      candidate: "Neha Verma",
+      email: "neha.verma@gmail.com",
+      job: "Frontend Developer",
+      appliedDate: "27 Sep 2026",
+      status: "Rejected",
+    },
+    {
+      id: 5,
+      candidate: "Arjun Patel",
+      email: "arjun.patel@gmail.com",
+      job: "Full Stack Developer",
+      appliedDate: "26 Sep 2026",
+      status: "Shortlisted",
+    },
+    {
+      id: 6,
+      candidate: "Sneha Gupta",
+      email: "sneha.gupta@gmail.com",
+      job: "Backend Developer",
+      appliedDate: "25 Sep 2026",
+      status: "Rejected",
+    },
+  ];
+
   const stats = [
     {
       title: "Total Applications",
@@ -38,6 +99,22 @@ function Applications() {
       icon: <CancelIcon />,
     },
   ];
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case "Shortlisted":
+        return "success";
+
+      case "Rejected":
+        return "error";
+
+      case "Applied":
+        return "warning";
+
+      default:
+        return "default";
+    }
+  };
 
   return (
     <Box>
@@ -62,7 +139,6 @@ function Applications() {
           </Typography>
         </Box>
 
-        {/* Job Selector */}
         <FormControl sx={{ minWidth: 220 }}>
           <InputLabel id="job-select-label">Select Job</InputLabel>
 
@@ -135,16 +211,111 @@ function Applications() {
         ))}
       </Grid>
 
-      {/* Applications Content Placeholder */}
+      {/* Applications Table */}
       <Card>
-        <CardContent>
-          <Typography variant="h6" fontWeight={600} sx={{ mb: 1 }}>
-            Candidate Applications
-          </Typography>
+        <CardContent sx={{ p: 0 }}>
+          <Box sx={{ p: 3, pb: 2 }}>
+            <Typography variant="h6" fontWeight={600}>
+              Candidate Applications
+            </Typography>
 
-          <Typography variant="body2" color="text.secondary">
-            Applications for the selected job will appear here.
-          </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+              View candidates who have applied for your jobs.
+            </Typography>
+          </Box>
+
+          <TableContainer
+            component={Paper}
+            elevation={0}
+            sx={{
+              width: "100%",
+              overflowX: "auto",
+            }}
+          >
+            <Table sx={{ minWidth: 850 }}>
+              <TableHead>
+                <TableRow>
+                  <TableCell>
+                    <strong>Candidate</strong>
+                  </TableCell>
+
+                  <TableCell>
+                    <strong>Email</strong>
+                  </TableCell>
+
+                  <TableCell>
+                    <strong>Job</strong>
+                  </TableCell>
+
+                  <TableCell>
+                    <strong>Applied Date</strong>
+                  </TableCell>
+
+                  <TableCell>
+                    <strong>Status</strong>
+                  </TableCell>
+
+                  <TableCell align="center">
+                    <strong>Action</strong>
+                  </TableCell>
+                </TableRow>
+              </TableHead>
+
+              <TableBody>
+                {applications.map((application) => (
+                  <TableRow
+                    key={application.id}
+                    hover
+                    sx={{
+                      "&:last-child td, &:last-child th": {
+                        border: 0,
+                      },
+                    }}
+                  >
+                    <TableCell>
+                      <Typography fontWeight={600}>
+                        {application.candidate}
+                      </Typography>
+                    </TableCell>
+
+                    <TableCell>
+                      <Typography variant="body2" color="text.secondary">
+                        {application.email}
+                      </Typography>
+                    </TableCell>
+
+                    <TableCell>{application.job}</TableCell>
+
+                    <TableCell>{application.appliedDate}</TableCell>
+
+                    <TableCell>
+                      <Chip
+                        label={application.status}
+                        color={getStatusColor(application.status)}
+                        size="small"
+                      />
+                    </TableCell>
+
+                    <TableCell align="center">
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        startIcon={<VisibilityIcon />}
+                        onClick={() =>
+                          console.log(
+                            "View application:",
+                            application.candidate
+                          )
+                        }
+                      >
+                        View
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
         </CardContent>
       </Card>
     </Box>
