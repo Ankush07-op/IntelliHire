@@ -1,0 +1,39 @@
+openapi: 3.0.0
+info:
+  title: IntelliHire ATS API
+  version: 1.0.0
+  description: AI-Powered Applicant Tracking System API Documentation
+servers:
+  - url: http://localhost:5000
+    description: Local Development Server
+paths:
+  /api/auth/register:
+    post:
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                email: { type: string }
+                password: { type: string }
+                role: { type: string, enum: [recruiter, applicant] }
+      responses:
+        201:
+          description: User created successfully
+  /api/jobs:
+    get:
+      summary: Fetch active job postings with search/pagination
+      parameters:
+        - in: query
+          name: search
+          schema: { type: string }
+        - in: query
+          name: page
+          schema: { type: integer }
+      responses:
+        200:
+          description: List of jobs returned
