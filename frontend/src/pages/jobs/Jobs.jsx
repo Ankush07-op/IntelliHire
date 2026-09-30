@@ -4,6 +4,7 @@ import {
   Button,
   Card,
   CardContent,
+  Chip,
   Dialog,
   DialogActions,
   DialogContent,
@@ -22,11 +23,15 @@ import AddIcon from "@mui/icons-material/Add";
 import WorkIcon from "@mui/icons-material/Work";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import ArchiveIcon from "@mui/icons-material/Archive";
+import LocationOnIcon from "@mui/icons-material/LocationOn";
+
 import { useState } from "react";
 
 function Jobs() {
   const [openDialog, setOpenDialog] = useState(false);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
+
+  const [jobs, setJobs] = useState([]);
 
   const [job, setJob] = useState({
     title: "",
@@ -57,6 +62,14 @@ function Jobs() {
   const handleCreateJob = (event) => {
     event.preventDefault();
 
+    const newJob = {
+      id: Date.now(),
+      ...job,
+      status: "Active",
+    };
+
+    setJobs((previousJobs) => [...previousJobs, newJob]);
+
     setOpenDialog(false);
     setSnackbarOpen(true);
 
@@ -69,6 +82,14 @@ function Jobs() {
       skills: "",
     });
   };
+
+  const activeJobs = jobs.filter(
+    (item) => item.status === "Active"
+  ).length;
+
+  const archivedJobs = jobs.filter(
+    (item) => item.status === "Archived"
+  ).length;
 
   return (
     <Box>
@@ -110,7 +131,13 @@ function Jobs() {
         <Grid xs={12} sm={4}>
           <Card>
             <CardContent>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 2,
+                }}
+              >
                 <WorkIcon color="primary" />
 
                 <Box>
@@ -119,7 +146,7 @@ function Jobs() {
                   </Typography>
 
                   <Typography variant="h4" fontWeight={600}>
-                    0
+                    {jobs.length}
                   </Typography>
                 </Box>
               </Box>
@@ -130,7 +157,13 @@ function Jobs() {
         <Grid xs={12} sm={4}>
           <Card>
             <CardContent>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 2,
+                }}
+              >
                 <CheckCircleIcon color="success" />
 
                 <Box>
@@ -139,7 +172,7 @@ function Jobs() {
                   </Typography>
 
                   <Typography variant="h4" fontWeight={600}>
-                    0
+                    {activeJobs}
                   </Typography>
                 </Box>
               </Box>
@@ -150,7 +183,13 @@ function Jobs() {
         <Grid xs={12} sm={4}>
           <Card>
             <CardContent>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 2,
+                }}
+              >
                 <ArchiveIcon color="action" />
 
                 <Box>
@@ -159,7 +198,7 @@ function Jobs() {
                   </Typography>
 
                   <Typography variant="h4" fontWeight={600}>
-                    0
+                    {archivedJobs}
                   </Typography>
                 </Box>
               </Box>
@@ -168,18 +207,117 @@ function Jobs() {
         </Grid>
       </Grid>
 
-      {/* Jobs List */}
-      <Card>
-        <CardContent>
-          <Typography variant="h6" fontWeight={600}>
-            Job Listings
-          </Typography>
+      {/* Job Listings */}
+      <Box>
+        {jobs.length === 0 ? (
+          <Card>
+            <CardContent>
+              <Typography variant="h6" fontWeight={600}>
+                Job Listings
+              </Typography>
 
-          <Typography color="text.secondary" sx={{ mt: 1 }}>
-            No jobs have been created yet.
-          </Typography>
-        </CardContent>
-      </Card>
+              <Typography
+                color="text.secondary"
+                sx={{ mt: 1 }}
+              >
+                No jobs have been created yet.
+              </Typography>
+            </CardContent>
+          </Card>
+        ) : (
+          <Grid container spacing={3}>
+            {jobs.map((item) => (
+              <Grid xs={12} md={6} key={item.id}>
+                <Card>
+                  <CardContent>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "flex-start",
+                        gap: 2,
+                      }}
+                    >
+                      <Box>
+                        <Typography
+                          variant="h6"
+                          fontWeight={600}
+                        >
+                          {item.title}
+                        </Typography>
+
+                        <Typography
+                          color="text.secondary"
+                          sx={{ mt: 0.5 }}
+                        >
+                          {item.department}
+                        </Typography>
+                      </Box>
+
+                      <Chip
+                        label={item.status}
+                        color={
+                          item.status === "Active"
+                            ? "success"
+                            : "default"
+                        }
+                        size="small"
+                      />
+                    </Box>
+
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1,
+                        mt: 2,
+                      }}
+                    >
+                      <LocationOnIcon
+                        fontSize="small"
+                        color="action"
+                      />
+
+                      <Typography variant="body2">
+                        {item.location}
+                      </Typography>
+                    </Box>
+
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ mt: 1 }}
+                    >
+                      {item.employmentType}
+                    </Typography>
+
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        mt: 2,
+                        display: "-webkit-box",
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: "vertical",
+                        overflow: "hidden",
+                      }}
+                    >
+                      {item.description}
+                    </Typography>
+
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ mt: 2 }}
+                    >
+                      Skills: {item.skills}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+        )}
+      </Box>
 
       {/* Create Job Dialog */}
       <Dialog
@@ -237,10 +375,21 @@ function Jobs() {
                     value={job.employmentType}
                     onChange={handleChange}
                   >
-                    <MenuItem value="Full-time">Full-time</MenuItem>
-                    <MenuItem value="Part-time">Part-time</MenuItem>
-                    <MenuItem value="Internship">Internship</MenuItem>
-                    <MenuItem value="Contract">Contract</MenuItem>
+                    <MenuItem value="Full-time">
+                      Full-time
+                    </MenuItem>
+
+                    <MenuItem value="Part-time">
+                      Part-time
+                    </MenuItem>
+
+                    <MenuItem value="Internship">
+                      Internship
+                    </MenuItem>
+
+                    <MenuItem value="Contract">
+                      Contract
+                    </MenuItem>
                   </Select>
                 </FormControl>
               </Grid>
