@@ -101,6 +101,35 @@ class TestResumeParser(unittest.TestCase):
             2.0,
         )
 
+    def test_detect_spaced_letter_headings(self):
+        text = """
+        S K I L L S
+        Python, Java, React
+
+        W O R K E X P E R I E N C E
+        Software Developer - 2 years
+
+        EDUCATION
+        MCA
+        """
+
+        sections = detect_sections(text)
+
+        self.assertEqual(
+            sections["skills"],
+            "Python, Java, React",
+        )
+
+        self.assertEqual(
+            sections["experience"],
+            "Software Developer - 2 years",
+        )
+
+        self.assertEqual(
+            sections["education"],
+            "MCA",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

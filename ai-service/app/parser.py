@@ -1,4 +1,5 @@
 import re
+from datetime import date
 from pathlib import Path
 
 from pypdf import PdfReader
@@ -30,6 +31,34 @@ SECTION_ALIASES = {
         "work history",
         "career history",
     ],
+}
+
+
+MONTHS = {
+    "jan": 1,
+    "january": 1,
+    "feb": 2,
+    "february": 2,
+    "mar": 3,
+    "march": 3,
+    "apr": 4,
+    "april": 4,
+    "may": 5,
+    "jun": 6,
+    "june": 6,
+    "jul": 7,
+    "july": 7,
+    "aug": 8,
+    "august": 8,
+    "sep": 9,
+    "sept": 9,
+    "september": 9,
+    "oct": 10,
+    "october": 10,
+    "nov": 11,
+    "november": 11,
+    "dec": 12,
+    "december": 12,
 }
 
 
@@ -107,24 +136,49 @@ def normalize_heading(text: str) -> str:
 
 
 def detect_section_heading(line: str) -> str | None:
-    """Return the section name if the line matches a known heading."""
+    """Detect known resume section headings."""
     normalized = normalize_heading(line)
 
     for section, aliases in SECTION_ALIASES.items():
+
         if normalized in aliases:
             return section
 
+        # Handle PDF headings where letters are extracted with spaces.
+        # Example:
+        # S K I L L S
+        # W O R K E X P E R I E N C E
+        compact_normalized = re.sub(r"\s+", "", normalized)
+
+        for alias in aliases:
+            compact_alias = re.sub(r"\s+", "", alias)
+
+            if compact_normalized == compact_alias:
+                return section
+
     return None
 
+
 def extract_skills(skills_text: str) -> list[str]:
-    """Extract and normalize individual skills from the skills section."""
+    """Extract actual skills while ignoring common skill-category headings."""
     if not skills_text:
         return []
 
-    # Replace common separators with commas
+    category_headings = {
+        "reporting & bi",
+        "data & querying",
+        "accounting",
+        "compliance",
+        "professional",
+        "technical skills",
+        "core skills",
+        "key skills",
+        "skills & technologies",
+        "technical expertise",
+    }
+
     normalized = re.sub(r"[|;/•]", ",", skills_text)
 
-    # Split by commas and new lines
     raw_skills = re.split(r",|\n", normalized)
 
     skills = []
@@ -135,39 +189,206 @@ def extract_skills(skills_text: str) -> list[str]:
         if not skill:
             continue
 
-        # Remove bullet characters
-        skill = re.sub(r"^[\-\*\u2022]+", "", skill).strip()
+        skill = re.sub(
+            r"^[\-\*\u2022]+",
+            "",
+            skill,
+        ).strip()
 
-        if skill and skill.lower() not in {s.lower() for s in skills}:
+        if skill.lower() in category_headings:
+            continue
+
+        # Remove unnecessary trailing punctuation.
+        skill = skill.rstrip(".,;:")
+
+        if not skill:
+            continue
+
+        if skill.lower() not in {
+            existing.lower()
+            for existing in skills
+        }:
             skills.append(skill)
 
     return skills
 
 
-def extract_experience_years(experience_text: str) -> float:
-    """Extract the highest explicit years-of-experience value."""
+def _month_to_number(month: str) -> int | None:
+    """Convert a month name or abbreviation into its month number."""
+    return MONTHS.get(month.lower())
+
+
+def _calculate_month_difference(
+    start_month: int,
+    start_year: int,
+    end_month: int,
+    end_year: int,
+) -> int:
+    """Calculate the number of months between two month/year values."""
+    return (
+        (end_year - start_year) * 12
+        + (end_month - start_month)
+    )
+
+
+def extract_date_based_experience_years(
+    experience_text: str,
+) -> float:
+    """
+    Extract experience from employment date ranges.
+
+    Supports examples such as:
+    - Aug 2024 – Jul 2025
+    - August 2024 - July 2025
+    - Aug 2025 – Present
+    - Jan 2020 to Dec 2022
+    """
     if not experience_text:
         return 0.0
 
+    current_date = date.today()
+
+    date_pattern = re.compile(
+        r"\b("
+        r"Jan(?:uary)?|"
+        r"Feb(?:ruary)?|"
+        r"Mar(?:ch)?|"
+        r"Apr(?:il)?|"
+        r"May|"
+        r"Jun(?:e)?|"
+        r"Jul(?:y)?|"
+        r"Aug(?:ust)?|"
+        r"Sep(?:t(?:ember)?)?|"
+        r"Oct(?:ober)?|"
+        r"Nov(?:ember)?|"
+        r"Dec(?:ember)?"
+        r")\s+"
+        r"(\d{4})"
+        r"\s*(?:-|–|—|to)\s*"
+        r"("
+        r"Jan(?:uary)?|"
+        r"Feb(?:ruary)?|"
+        r"Mar(?:ch)?|"
+        r"Apr(?:il)?|"
+        r"May|"
+        r"Jun(?:e)?|"
+        r"Jul(?:y)?|"
+        r"Aug(?:ust)?|"
+        r"Sep(?:t(?:ember)?)?|"
+        r"Oct(?:ober)?|"
+        r"Nov(?:ember)?|"
+        r"Dec(?:ember)?|"
+        r"Present|"
+        r"Current"
+        r")"
+        r"(?:\s+(\d{4}))?",
+        re.IGNORECASE,
+    )
+
+    total_months = 0
+
+    for match in date_pattern.finditer(experience_text):
+
+        (
+            start_month_name,
+            start_year,
+            end_month_name,
+            end_year,
+        ) = match.groups()
+
+        start_month = _month_to_number(start_month_name)
+
+        if end_month_name.lower() in {"present", "current"}:
+            end_month = current_date.month
+            end_year_number = current_date.year
+        else:
+            end_month = _month_to_number(end_month_name)
+
+            if end_year is None:
+                continue
+
+            end_year_number = int(end_year)
+
+        if start_month is None or end_month is None:
+            continue
+
+        months = _calculate_month_difference(
+            start_month,
+            int(start_year),
+            end_month,
+            end_year_number,
+        )
+
+        if months > 0:
+            total_months += months
+
+    return round(total_months / 12, 1)
+
+
+def extract_experience_years(experience_text: str) -> float:
+    """
+    Extract experience years from explicit experience statements
+    and employment date ranges.
+
+    Examples:
+    - 2 years -> 2.0
+    - 5+ years -> 5.0
+    - Aug 2024 – Jul 2025 -> approximately 0.9
+    - Aug 2025 – Present -> calculated from the current date
+    """
+    if not experience_text:
+        return 0.0
+
+    # Handle explicit statements such as:
+    # "2 years"
+    # "3 yrs"
+    # "5+ years"
     matches = re.findall(
         r"(\d+(?:\.\d+)?)\s*\+?\s*(?:years?|yrs?)",
         experience_text.lower(),
     )
 
-    if not matches:
-        return 0.0
+    explicit_years = 0.0
 
-    return max(float(value) for value in matches)
+    if matches:
+        explicit_years = max(
+            float(value)
+            for value in matches
+        )
+
+    # Handle employment date ranges.
+    date_based_years = extract_date_based_experience_years(
+        experience_text
+    )
+
+    # Return whichever method provides the larger value.
+    return max(
+        explicit_years,
+        date_based_years,
+    )
 
 
-def build_structured_resume(sections: dict[str, str]) -> dict:
+def build_structured_resume(
+    sections: dict[str, str],
+) -> dict:
     """Convert detected sections into structured resume data."""
     return {
-        "skills": extract_skills(sections.get("skills", "")),
-        "education": sections.get("education", ""),
-        "experience": sections.get("experience", ""),
+        "skills": extract_skills(
+            sections.get("skills", "")
+        ),
+        "education": sections.get(
+            "education",
+            "",
+        ),
+        "experience": sections.get(
+            "experience",
+            "",
+        ),
         "experience_years": extract_experience_years(
-            sections.get("experience", "")
+            sections.get(
+                "experience",
+                "",
+            )
         ),
     }
 
@@ -192,6 +413,7 @@ def detect_sections(text: str) -> dict[str, str]:
     current_section = None
 
     for line in text.splitlines():
+
         line = line.strip()
 
         if not line:
@@ -213,11 +435,15 @@ def detect_sections(text: str) -> dict[str, str]:
 
 
 def parse_resume(file_path: str) -> dict:
-    """Extract, clean and section a resume."""
+    """Parse a resume into raw, sectioned, and structured data."""
     text = extract_resume_text(file_path)
+
     sections = detect_sections(text)
+
+    structured = build_structured_resume(sections)
 
     return {
         "raw_text": text,
         "sections": sections,
+        "structured": structured,
     }
