@@ -5,7 +5,9 @@ import MainLayout from "./components/layout/MainLayout";
 import Dashboard from "./pages/dashboard/Dashboard";
 import Jobs from "./pages/jobs/Jobs";
 import Applications from "./pages/applications/Applications";
+import Kanban from "./pages/kanban/Kanban";
 import Ranking from "./pages/ranking/Ranking";
+
 
 import RecruiterLogin from "./pages/auth/RecruiterLogin";
 import RecruiterRegister from "./pages/auth/RecruiterRegister";
@@ -27,6 +29,7 @@ function App() {
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="jobs" element={<Jobs />} />
           <Route path="applications" element={<Applications />} />
+          <Route path="kanban" element={<Kanban />} />
           <Route path="ranking" element={<Ranking />} />
         </Route>
       </Route>
