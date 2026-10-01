@@ -1,8 +1,15 @@
+import { useState } from "react";
+
 import {
   Box,
   Button,
   Card,
   CardContent,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Divider,
   FormControl,
   Grid,
   InputLabel,
@@ -26,6 +33,8 @@ import CancelIcon from "@mui/icons-material/Cancel";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 
 function Applications() {
+  const [selectedApplication, setSelectedApplication] = useState(null);
+
   const applications = [
     {
       id: 1,
@@ -34,6 +43,13 @@ function Applications() {
       job: "Frontend Developer",
       appliedDate: "30 Sep 2026",
       status: "Applied",
+      phone: "+91 98765 43210",
+      location: "Bangalore, India",
+      education: "MCA",
+      experience: "2 Years",
+      skills: ["React.js", "JavaScript", "HTML", "CSS"],
+      summary:
+        "Frontend developer with experience building responsive web applications using React.js and modern JavaScript.",
     },
     {
       id: 2,
@@ -42,6 +58,13 @@ function Applications() {
       job: "Full Stack Developer",
       appliedDate: "29 Sep 2026",
       status: "Shortlisted",
+      phone: "+91 98765 12345",
+      location: "Bangalore, India",
+      education: "M.Tech Computer Science",
+      experience: "3 Years",
+      skills: ["React.js", "Node.js", "MongoDB", "Express.js"],
+      summary:
+        "Full stack developer experienced in developing scalable web applications using React, Node.js and MongoDB.",
     },
     {
       id: 3,
@@ -50,6 +73,13 @@ function Applications() {
       job: "Backend Developer",
       appliedDate: "28 Sep 2026",
       status: "Applied",
+      phone: "+91 99887 66554",
+      location: "Pune, India",
+      education: "B.Tech Computer Science",
+      experience: "1 Year",
+      skills: ["Node.js", "Express.js", "PostgreSQL", "REST API"],
+      summary:
+        "Backend developer focused on REST APIs, database development and server-side application logic.",
     },
     {
       id: 4,
@@ -58,6 +88,13 @@ function Applications() {
       job: "Frontend Developer",
       appliedDate: "27 Sep 2026",
       status: "Rejected",
+      phone: "+91 91234 56789",
+      location: "Delhi, India",
+      education: "BCA",
+      experience: "1 Year",
+      skills: ["HTML", "CSS", "JavaScript", "Bootstrap"],
+      summary:
+        "Frontend developer with experience creating responsive interfaces and basic web applications.",
     },
     {
       id: 5,
@@ -66,6 +103,13 @@ function Applications() {
       job: "Full Stack Developer",
       appliedDate: "26 Sep 2026",
       status: "Shortlisted",
+      phone: "+91 90000 11223",
+      location: "Mumbai, India",
+      education: "MCA",
+      experience: "4 Years",
+      skills: ["React.js", "Node.js", "MongoDB", "AWS"],
+      summary:
+        "Experienced full stack developer with strong knowledge of frontend, backend and cloud technologies.",
     },
     {
       id: 6,
@@ -74,6 +118,13 @@ function Applications() {
       job: "Backend Developer",
       appliedDate: "25 Sep 2026",
       status: "Rejected",
+      phone: "+91 91111 22334",
+      location: "Hyderabad, India",
+      education: "B.Tech IT",
+      experience: "2 Years",
+      skills: ["Java", "Spring Boot", "MySQL", "REST API"],
+      summary:
+        "Backend developer experienced in Java-based application development and database management.",
     },
   ];
 
@@ -114,6 +165,14 @@ function Applications() {
       default:
         return "default";
     }
+  };
+
+  const handleViewApplication = (application) => {
+    setSelectedApplication(application);
+  };
+
+  const handleCloseDetails = () => {
+    setSelectedApplication(null);
   };
 
   return (
@@ -301,12 +360,7 @@ function Applications() {
                         variant="outlined"
                         size="small"
                         startIcon={<VisibilityIcon />}
-                        onClick={() =>
-                          console.log(
-                            "View application:",
-                            application.candidate
-                          )
-                        }
+                        onClick={() => handleViewApplication(application)}
                       >
                         View
                       </Button>
@@ -318,6 +372,157 @@ function Applications() {
           </TableContainer>
         </CardContent>
       </Card>
+
+      {/* Candidate Details Dialog */}
+      <Dialog
+        open={Boolean(selectedApplication)}
+        onClose={handleCloseDetails}
+        fullWidth
+        maxWidth="md"
+      >
+        {selectedApplication && (
+          <>
+            <DialogTitle>
+              <Typography variant="h5" fontWeight={700}>
+                Candidate Details
+              </Typography>
+
+              <Typography variant="body2" color="text.secondary">
+                Application #{selectedApplication.id}
+              </Typography>
+            </DialogTitle>
+
+            <DialogContent dividers>
+              {/* Candidate Header */}
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="h6" fontWeight={700}>
+                  {selectedApplication.candidate}
+                </Typography>
+
+                <Typography variant="body2" color="text.secondary">
+                  {selectedApplication.email}
+                </Typography>
+              </Box>
+
+              <Divider sx={{ mb: 3 }} />
+
+              {/* Basic Information */}
+              <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 2 }}>
+                Application Information
+              </Typography>
+
+              <Grid container spacing={2} sx={{ mb: 3 }}>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Applied For
+                  </Typography>
+
+                  <Typography fontWeight={600}>
+                    {selectedApplication.job}
+                  </Typography>
+                </Grid>
+
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Applied Date
+                  </Typography>
+
+                  <Typography fontWeight={600}>
+                    {selectedApplication.appliedDate}
+                  </Typography>
+                </Grid>
+
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Status
+                  </Typography>
+
+                  <Box sx={{ mt: 0.5 }}>
+                    <Chip
+                      label={selectedApplication.status}
+                      color={getStatusColor(selectedApplication.status)}
+                      size="small"
+                    />
+                  </Box>
+                </Grid>
+
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Phone
+                  </Typography>
+
+                  <Typography fontWeight={600}>
+                    {selectedApplication.phone}
+                  </Typography>
+                </Grid>
+
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Location
+                  </Typography>
+
+                  <Typography fontWeight={600}>
+                    {selectedApplication.location}
+                  </Typography>
+                </Grid>
+
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Education
+                  </Typography>
+
+                  <Typography fontWeight={600}>
+                    {selectedApplication.education}
+                  </Typography>
+                </Grid>
+
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Experience
+                  </Typography>
+
+                  <Typography fontWeight={600}>
+                    {selectedApplication.experience}
+                  </Typography>
+                </Grid>
+              </Grid>
+
+              {/* Skills */}
+              <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1 }}>
+                Skills
+              </Typography>
+
+              <Box
+                sx={{
+                  display: "flex",
+                  gap: 1,
+                  flexWrap: "wrap",
+                  mb: 3,
+                }}
+              >
+                {selectedApplication.skills.map((skill) => (
+                  <Chip key={skill} label={skill} variant="outlined" />
+                ))}
+              </Box>
+
+              {/* Summary */}
+              <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1 }}>
+                Application Summary
+              </Typography>
+
+              <Typography variant="body2" color="text.secondary">
+                {selectedApplication.summary}
+              </Typography>
+            </DialogContent>
+
+            <DialogActions sx={{ p: 2 }}>
+              <Button onClick={handleCloseDetails} variant="contained">
+                Close
+              </Button>
+            </DialogActions>
+          </>
+        )}
+      </Dialog>
     </Box>
   );
 }
