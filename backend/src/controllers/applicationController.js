@@ -2,6 +2,7 @@ const Application = require('../models/Application');
 const Job = require('../models/Job');
 const { triggerAIAnalysis } = require('../services/aiService');
 const AIAnalysis = require('../models/AIAnalysis');
+const { sendStatusUpdateEmail, sendInterviewInviteEmail } = require('../services/emailService');
 
 // @desc    Submit a new job application
 // @route   POST /api/applications
@@ -117,9 +118,62 @@ const getApplicationAnalysis = async (req, res) => {
   }
 };
 
+// @desc    Update application pipeline status & trigger email notification
+// @route   PATCH /api/applications/:id/status
+// @access  Private (Recruiter only)
+const updateApplicationStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, interviewDetails } = req.body;
+
+    const validStatuses = ['Applied', 'Shortlisted', 'Interview', 'Offered', 'Rejected'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ message: 'Invalid pipeline status' });
+    }
+
+    const application = await Application.findById(id)
+      .populate('applicantId', 'name email')
+      .populate('jobId', 'title recruiterId');
+
+    if (!application) {
+      return res.status(404).json({ message: 'Application not found' });
+    }
+
+    // Verify requesting recruiter owns the job
+    if (application.jobId.recruiterId.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'Not authorized to update this status' });
+    }
+
+    application.status = status;
+    await application.save();
+
+    // Trigger automated email notification (M2 logic)
+    if (status === 'Interview' && interviewDetails) {
+      await sendInterviewInviteEmail(
+        application.applicantId.email,
+        application.applicantId.name,
+        application.jobId.title,
+        interviewDetails
+      );
+    } else {
+      await sendStatusUpdateEmail(
+        application.applicantId.email,
+        application.applicantId.name,
+        application.jobId.title,
+        status
+      );
+    }
+
+    res.json({ message: 'Status updated successfully', application });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   applyForJob,
   getApplicationsByJob,
   getMyApplications,
   getApplicationAnalysis,
+  updateApplicationStatus,
 };
