@@ -3,6 +3,8 @@ const Job = require('../models/Job');
 const { triggerAIAnalysis } = require('../services/aiService');
 const AIAnalysis = require('../models/AIAnalysis');
 const { sendStatusUpdateEmail, sendInterviewInviteEmail } = require('../services/emailService');
+const { uploadToS3 } = require('../services/s3Service');
+const { getPresignedDownloadUrl } = require('../services/s3Service');
 
 // @desc    Submit a new job application
 // @route   POST /api/applications
@@ -31,16 +33,20 @@ const applyForJob = async (req, res) => {
       return res.status(400).json({ message: 'You have already applied for this position' });
     }
 
+    // Upload file buffer to AWS S3 and get key
+    const s3Key = await uploadToS3(file);
+
+    // Save Application record in MongoDB
     const application = await Application.create({
       jobId,
       applicantId: req.user.id,
-      resumeUrl,
+      resumeUrl: s3Key, // Storing S3 key
     });
 
     // Trigger AI Analysis Asynchronously (Non-blocking)
     triggerAIAnalysis(
       application._id,
-      resumeUrl,
+      s3Key,
       job.description,
       job.requiredSkills
     );
@@ -170,10 +176,49 @@ const updateApplicationStatus = async (req, res) => {
   }
 };
 
+// @desc    Get secure pre-signed resume download URL
+// @route   GET /api/applications/:id/resume
+// @access  Private (Applicant who owns resume OR Recruiter who owns job)
+const getResumeDownloadUrl = async (req, res) => {
+  try {
+    // Populate job details to perform recruiter ownership check
+    const application = await Application.findById(req.params.id)
+      .populate('jobId', 'recruiterId');
+
+    if (!application) {
+      return res.status(404).json({ message: 'Application not found' });
+    }
+
+    const userId = req.user.id;
+    const isApplicant = application.applicantId.toString() === userId;
+    const isJobOwnerRecruiter =
+      req.user.role === 'recruiter' &&
+      application.jobId.recruiterId.toString() === userId;
+
+    // Reject access if user is neither the candidate nor the hiring recruiter
+    if (!isApplicant && !isJobOwnerRecruiter) {
+      return res.status(403).json({
+        message: 'Not authorized to access this candidate document',
+      });
+    }
+
+    // Generate 15-minute expiring pre-signed URL from AWS S3 key
+    const downloadUrl = await getPresignedDownloadUrl(application.resumeUrl);
+
+    res.json({
+      downloadUrl,
+      expiresIn: 900, // 15 minutes in seconds
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   applyForJob,
   getApplicationsByJob,
   getMyApplications,
   getApplicationAnalysis,
   updateApplicationStatus,
+  getResumeDownloadUrl,
 };
