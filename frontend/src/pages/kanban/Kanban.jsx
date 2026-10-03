@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   Box,
@@ -13,50 +13,10 @@ import WorkIcon from "@mui/icons-material/Work";
 import PersonIcon from "@mui/icons-material/Person";
 import EmailIcon from "@mui/icons-material/Email";
 
-const initialCandidates = [
-  {
-    id: 1,
-    name: "Rahul Sharma",
-    email: "rahul.sharma@gmail.com",
-    job: "Frontend Developer",
-    status: "Pending",
-  },
-  {
-    id: 2,
-    name: "Priya Singh",
-    email: "priya.singh@gmail.com",
-    job: "Frontend Developer",
-    status: "Shortlisted",
-  },
-  {
-    id: 3,
-    name: "Amit Kumar",
-    email: "amit.kumar@gmail.com",
-    job: "Backend Developer",
-    status: "Interview",
-  },
-  {
-    id: 4,
-    name: "Neha Verma",
-    email: "neha.verma@gmail.com",
-    job: "Backend Developer",
-    status: "Pending",
-  },
-  {
-    id: 5,
-    name: "Arjun Patel",
-    email: "arjun.patel@gmail.com",
-    job: "Full Stack Developer",
-    status: "Shortlisted",
-  },
-  {
-    id: 6,
-    name: "Sneha Gupta",
-    email: "sneha.gupta@gmail.com",
-    job: "Frontend Developer",
-    status: "Rejected",
-  },
-];
+import {
+  getApplications,
+  updateApplicationStatus,
+} from "../../services/applicationStore";
 
 const columns = [
   {
@@ -78,13 +38,31 @@ const columns = [
 ];
 
 function Kanban() {
-  const [candidates] = useState(initialCandidates);
+  const [applications, setApplications] = useState([]);
+  const [draggedApplication, setDraggedApplication] =
+    useState(null);
+  const [draggedOverColumn, setDraggedOverColumn] =
+    useState(null);
 
-  const getColumnCount = (status) => {
-    return candidates.filter(
-      (candidate) => candidate.status === status
-    ).length;
-  };
+  useEffect(() => {
+    setApplications(getApplications());
+
+    const handleApplicationsUpdated = (event) => {
+      setApplications(event.detail);
+    };
+
+    window.addEventListener(
+      "applicationsUpdated",
+      handleApplicationsUpdated
+    );
+
+    return () => {
+      window.removeEventListener(
+        "applicationsUpdated",
+        handleApplicationsUpdated
+      );
+    };
+  }, []);
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -103,6 +81,48 @@ function Kanban() {
       default:
         return "default";
     }
+  };
+
+  const handleDragStart = (application) => {
+    setDraggedApplication(application);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedApplication(null);
+    setDraggedOverColumn(null);
+  };
+
+  const handleDragOver = (event, columnId) => {
+    event.preventDefault();
+    setDraggedOverColumn(columnId);
+  };
+
+  const handleDragLeave = () => {
+    setDraggedOverColumn(null);
+  };
+
+  const handleDrop = (event, columnId) => {
+    event.preventDefault();
+
+    if (!draggedApplication) {
+      return;
+    }
+
+    if (draggedApplication.status === columnId) {
+      handleDragEnd();
+      return;
+    }
+
+    const updatedApplications =
+      updateApplicationStatus(
+        draggedApplication.id,
+        columnId
+      );
+
+    setApplications(updatedApplications);
+
+    setDraggedApplication(null);
+    setDraggedOverColumn(null);
   };
 
   return (
@@ -128,10 +148,11 @@ function Kanban() {
       {/* Kanban Columns */}
       <Grid container spacing={2}>
         {columns.map((column) => {
-          const columnCandidates = candidates.filter(
-            (candidate) =>
-              candidate.status === column.id
-          );
+          const columnApplications =
+            applications.filter(
+              (application) =>
+                application.status === column.id
+            );
 
           return (
             <Grid
@@ -143,11 +164,23 @@ function Kanban() {
               key={column.id}
             >
               <Box
+                onDragOver={(event) =>
+                  handleDragOver(event, column.id)
+                }
+                onDragLeave={handleDragLeave}
+                onDrop={(event) =>
+                  handleDrop(event, column.id)
+                }
                 sx={{
-                  backgroundColor: "#f5f7fa",
+                  backgroundColor:
+                    draggedOverColumn === column.id
+                      ? "#e3f2fd"
+                      : "#f5f7fa",
                   borderRadius: 2,
                   minHeight: 500,
                   p: 2,
+                  transition:
+                    "background-color 0.2s ease",
                 }}
               >
                 {/* Column Header */}
@@ -167,7 +200,7 @@ function Kanban() {
                   </Typography>
 
                   <Chip
-                    label={getColumnCount(column.id)}
+                    label={columnApplications.length}
                     size="small"
                     color={getStatusColor(column.id)}
                   />
@@ -179,18 +212,27 @@ function Kanban() {
                     display: "flex",
                     flexDirection: "column",
                     gap: 2,
+                    minHeight: 400,
                   }}
                 >
-                  {columnCandidates.map(
-                    (candidate) => (
+                  {columnApplications.map(
+                    (application) => (
                       <Card
-                        key={candidate.id}
+                        key={application.id}
+                        draggable
+                        onDragStart={() =>
+                          handleDragStart(application)
+                        }
+                        onDragEnd={handleDragEnd}
                         elevation={1}
                         sx={{
                           borderRadius: 2,
                           cursor: "grab",
                           "&:hover": {
                             boxShadow: 4,
+                          },
+                          "&:active": {
+                            cursor: "grabbing",
                           },
                         }}
                       >
@@ -212,7 +254,7 @@ function Kanban() {
                             <Typography
                               fontWeight={600}
                             >
-                              {candidate.name}
+                              {application.candidate}
                             </Typography>
                           </Box>
 
@@ -238,7 +280,7 @@ function Kanban() {
                                   "break-word",
                               }}
                             >
-                              {candidate.email}
+                              {application.email}
                             </Typography>
                           </Box>
 
@@ -252,23 +294,23 @@ function Kanban() {
                             }}
                           >
                             <WorkIcon
-                                fontSize="small"
-                                color="action"
-                                />
+                              fontSize="small"
+                              color="action"
+                            />
 
                             <Typography
                               variant="body2"
                               color="text.secondary"
                             >
-                              {candidate.job}
+                              {application.job}
                             </Typography>
                           </Box>
 
                           {/* Status */}
                           <Chip
-                            label={candidate.status}
+                            label={application.status}
                             color={getStatusColor(
-                              candidate.status
+                              application.status
                             )}
                             size="small"
                           />
@@ -278,7 +320,7 @@ function Kanban() {
                   )}
 
                   {/* Empty Column */}
-                  {columnCandidates.length ===
+                  {columnApplications.length ===
                     0 && (
                     <Box
                       sx={{
@@ -307,4 +349,4 @@ function Kanban() {
   );
 }
 
-export default Kanban;git push origin feature/recruiter-portal
+export default Kanban;
