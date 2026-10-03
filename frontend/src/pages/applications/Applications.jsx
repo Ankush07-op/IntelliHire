@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   Alert,
@@ -35,12 +35,18 @@ import VisibilityIcon from "@mui/icons-material/Visibility";
 import DescriptionIcon from "@mui/icons-material/Description";
 import DownloadIcon from "@mui/icons-material/Download";
 
+import { getApplications } from "../../services/applicationStore";
+
 function Applications() {
   const [selectedJob, setSelectedJob] = useState("all");
 
-  const [selectedApplication, setSelectedApplication] = useState(null);
+  const [applications, setApplications] = useState(
+    getApplications()
+  );
 
-  // Resume states
+  const [selectedApplication, setSelectedApplication] =
+    useState(null);
+
   const [resumeOpen, setResumeOpen] = useState(false);
   const [resumeLoading, setResumeLoading] = useState(false);
   const [resumeState, setResumeState] = useState("available");
@@ -50,153 +56,66 @@ function Applications() {
   const [snackbarMessage, setSnackbarMessage] = useState("");
 
   /*
-   * Temporary mock application data.
+   * Listen for application changes made from Kanban.
    *
-   * resumeState:
-   * available  -> Resume can be previewed/downloaded
-   * unsupported -> Resume format cannot be previewed
-   * error      -> Resume loading error
-   *
-   * This will later be replaced with the real backend API.
+   * Kanban updates the shared application store and
+   * dispatches the "applicationsUpdated" event.
    */
-  const applications = [
-    {
-      id: 1,
-      candidate: "Rahul Sharma",
-      email: "rahul.sharma@gmail.com",
-      phone: "+91 9876543210",
-      location: "Bangalore, Karnataka",
-      education: "MCA - Bangalore University",
-      experience: "2 Years",
-      skills: [
-        "React.js",
-        "JavaScript",
-        "Node.js",
-        "MongoDB",
-      ],
-      summary:
-        "Full Stack Developer with experience building responsive web applications using React.js, Node.js and MongoDB.",
-      job: "Frontend Developer",
-      appliedDate: "2026-09-25",
-      status: "Pending",
-      resumeState: "available",
-    },
-    {
-      id: 2,
-      candidate: "Priya Singh",
-      email: "priya.singh@gmail.com",
-      phone: "+91 9876543211",
-      location: "Delhi, India",
-      education: "B.Tech - Computer Science",
-      experience: "1 Year",
-      skills: [
-        "React.js",
-        "HTML",
-        "CSS",
-        "JavaScript",
-      ],
-      summary:
-        "Frontend developer focused on creating clean, responsive and user-friendly interfaces.",
-      job: "Frontend Developer",
-      appliedDate: "2026-09-24",
-      status: "Shortlisted",
-      resumeState: "available",
-    },
-    {
-      id: 3,
-      candidate: "Amit Kumar",
-      email: "amit.kumar@gmail.com",
-      phone: "+91 9876543212",
-      location: "Patna, Bihar",
-      education: "BCA - Patna University",
-      experience: "3 Years",
-      skills: [
-        "Node.js",
-        "Express.js",
-        "MongoDB",
-        "REST API",
-      ],
-      summary:
-        "Backend developer experienced in building REST APIs and scalable server-side applications.",
-      job: "Backend Developer",
-      appliedDate: "2026-09-23",
-      status: "Rejected",
-      resumeState: "unsupported",
-    },
-    {
-      id: 4,
-      candidate: "Neha Verma",
-      email: "neha.verma@gmail.com",
-      phone: "+91 9876543213",
-      location: "Mumbai, Maharashtra",
-      education: "MCA - Mumbai University",
-      experience: "2 Years",
-      skills: [
-        "Java",
-        "Spring Boot",
-        "MySQL",
-        "REST API",
-      ],
-      summary:
-        "Software developer with experience in Java-based enterprise applications and backend systems.",
-      job: "Backend Developer",
-      appliedDate: "2026-09-22",
-      status: "Pending",
-      resumeState: "error",
-    },
-    {
-      id: 5,
-      candidate: "Arjun Patel",
-      email: "arjun.patel@gmail.com",
-      phone: "+91 9876543214",
-      location: "Ahmedabad, Gujarat",
-      education: "B.Tech - Information Technology",
-      experience: "4 Years",
-      skills: [
-        "React.js",
-        "Node.js",
-        "TypeScript",
-        "PostgreSQL",
-      ],
-      summary:
-        "Full Stack Developer with experience designing and developing modern web applications.",
-      job: "Full Stack Developer",
-      appliedDate: "2026-09-21",
-      status: "Shortlisted",
-      resumeState: "available",
-    },
-    {
-      id: 6,
-      candidate: "Sneha Gupta",
-      email: "sneha.gupta@gmail.com",
-      phone: "+91 9876543215",
-      location: "Hyderabad, Telangana",
-      education: "B.Tech - Computer Science",
-      experience: "1.5 Years",
-      skills: [
-        "React.js",
-        "JavaScript",
-        "Redux",
-        "Firebase",
-      ],
-      summary:
-        "Frontend developer experienced in React.js, state management and modern frontend development.",
-      job: "Frontend Developer",
-      appliedDate: "2026-09-20",
-      status: "Pending",
-      resumeState: "available",
-    },
-  ];
+  useEffect(() => {
+    const handleApplicationsUpdated = (event) => {
+      setApplications(event.detail);
+    };
 
-  const totalApplications = 12;
-  const pendingApplications = 5;
-  const shortlistedApplications = 4;
-  const rejectedApplications = 3;
+    window.addEventListener(
+      "applicationsUpdated",
+      handleApplicationsUpdated
+    );
+
+    return () => {
+      window.removeEventListener(
+        "applicationsUpdated",
+        handleApplicationsUpdated
+      );
+    };
+  }, []);
+
+  /*
+   * Keep the page synchronized when the browser tab
+   * becomes active again.
+   */
+  useEffect(() => {
+    const handleFocus = () => {
+      setApplications(getApplications());
+    };
+
+    window.addEventListener("focus", handleFocus);
+
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+    };
+  }, []);
+
+  const totalApplications = applications.length;
+
+  const pendingApplications = applications.filter(
+    (application) => application.status === "Pending"
+  ).length;
+
+  const shortlistedApplications = applications.filter(
+    (application) => application.status === "Shortlisted"
+  ).length;
+
+  const rejectedApplications = applications.filter(
+    (application) => application.status === "Rejected"
+  ).length;
 
   const getStatusColor = (status) => {
     switch (status) {
       case "Shortlisted":
         return "success";
+
+      case "Interview":
+        return "info";
 
       case "Rejected":
         return "error";
@@ -228,9 +147,6 @@ function Applications() {
 
   /*
    * Open resume preview.
-   *
-   * A small delay is intentionally added so the loading state
-   * can be demonstrated until the real backend API is connected.
    */
   const handleViewResume = (application) => {
     setResumeCandidate(application);
@@ -255,9 +171,6 @@ function Applications() {
 
   /*
    * Generates a temporary HTML resume for demo purposes.
-   *
-   * Later this will be replaced by the actual resume URL
-   * returned from the backend.
    */
   const getResumeHtml = (application) => {
     return `
@@ -362,8 +275,7 @@ function Applications() {
       return;
     }
 
-    const resumeHtml =
-      getResumeHtml(resumeCandidate);
+    const resumeHtml = getResumeHtml(resumeCandidate);
 
     const blob = new Blob([resumeHtml], {
       type: "text/html",
@@ -578,10 +490,9 @@ function Applications() {
         </Grid>
       </Grid>
 
-      {/* Applications Table Card */}
+      {/* Applications Table */}
       <Card>
         <CardContent>
-          {/* Table Header */}
           <Box
             sx={{
               display: "flex",
@@ -599,7 +510,6 @@ function Applications() {
               Candidate Applications
             </Typography>
 
-            {/* Job Filter */}
             <FormControl
               size="small"
               sx={{ minWidth: 220 }}
@@ -612,9 +522,7 @@ function Applications() {
                 value={selectedJob}
                 label="Filter by Job"
                 onChange={(event) =>
-                  setSelectedJob(
-                    event.target.value
-                  )
+                  setSelectedJob(event.target.value)
                 }
               >
                 <MenuItem value="all">
@@ -636,7 +544,6 @@ function Applications() {
             </FormControl>
           </Box>
 
-          {/* Applications Table */}
           <TableContainer
             component={Paper}
             variant="outlined"
@@ -678,9 +585,7 @@ function Applications() {
                       hover
                     >
                       <TableCell>
-                        <Typography
-                          fontWeight={600}
-                        >
+                        <Typography fontWeight={600}>
                           {application.candidate}
                         </Typography>
                       </TableCell>
@@ -727,8 +632,7 @@ function Applications() {
                   )
                 )}
 
-                {filteredApplications.length ===
-                  0 && (
+                {filteredApplications.length === 0 && (
                   <TableRow>
                     <TableCell
                       colSpan={6}
@@ -763,7 +667,6 @@ function Applications() {
         <DialogContent dividers>
           {selectedApplication && (
             <>
-              {/* Candidate Header */}
               <Box sx={{ mb: 3 }}>
                 <Typography
                   variant="h5"
@@ -780,7 +683,6 @@ function Applications() {
                 </Typography>
               </Box>
 
-              {/* Application Information */}
               <Typography
                 variant="h6"
                 fontWeight={600}
@@ -794,9 +696,7 @@ function Applications() {
                 spacing={2}
                 sx={{ mb: 3 }}
               >
-                <Grid
-                  size={{ xs: 12, sm: 6 }}
-                >
+                <Grid size={{ xs: 12, sm: 6 }}>
                   <Typography
                     variant="body2"
                     color="text.secondary"
@@ -809,9 +709,7 @@ function Applications() {
                   </Typography>
                 </Grid>
 
-                <Grid
-                  size={{ xs: 12, sm: 6 }}
-                >
+                <Grid size={{ xs: 12, sm: 6 }}>
                   <Typography
                     variant="body2"
                     color="text.secondary"
@@ -820,15 +718,11 @@ function Applications() {
                   </Typography>
 
                   <Typography fontWeight={600}>
-                    {
-                      selectedApplication.appliedDate
-                    }
+                    {selectedApplication.appliedDate}
                   </Typography>
                 </Grid>
 
-                <Grid
-                  size={{ xs: 12, sm: 6 }}
-                >
+                <Grid size={{ xs: 12, sm: 6 }}>
                   <Typography
                     variant="body2"
                     color="text.secondary"
@@ -837,9 +731,7 @@ function Applications() {
                   </Typography>
 
                   <Chip
-                    label={
-                      selectedApplication.status
-                    }
+                    label={selectedApplication.status}
                     color={getStatusColor(
                       selectedApplication.status
                     )}
@@ -848,9 +740,7 @@ function Applications() {
                   />
                 </Grid>
 
-                <Grid
-                  size={{ xs: 12, sm: 6 }}
-                >
+                <Grid size={{ xs: 12, sm: 6 }}>
                   <Typography
                     variant="body2"
                     color="text.secondary"
@@ -859,15 +749,11 @@ function Applications() {
                   </Typography>
 
                   <Typography fontWeight={600}>
-                    {
-                      selectedApplication.phone
-                    }
+                    {selectedApplication.phone}
                   </Typography>
                 </Grid>
 
-                <Grid
-                  size={{ xs: 12, sm: 6 }}
-                >
+                <Grid size={{ xs: 12, sm: 6 }}>
                   <Typography
                     variant="body2"
                     color="text.secondary"
@@ -876,15 +762,11 @@ function Applications() {
                   </Typography>
 
                   <Typography fontWeight={600}>
-                    {
-                      selectedApplication.location
-                    }
+                    {selectedApplication.location}
                   </Typography>
                 </Grid>
 
-                <Grid
-                  size={{ xs: 12, sm: 6 }}
-                >
+                <Grid size={{ xs: 12, sm: 6 }}>
                   <Typography
                     variant="body2"
                     color="text.secondary"
@@ -893,15 +775,11 @@ function Applications() {
                   </Typography>
 
                   <Typography fontWeight={600}>
-                    {
-                      selectedApplication.education
-                    }
+                    {selectedApplication.education}
                   </Typography>
                 </Grid>
 
-                <Grid
-                  size={{ xs: 12, sm: 6 }}
-                >
+                <Grid size={{ xs: 12, sm: 6 }}>
                   <Typography
                     variant="body2"
                     color="text.secondary"
@@ -910,14 +788,11 @@ function Applications() {
                   </Typography>
 
                   <Typography fontWeight={600}>
-                    {
-                      selectedApplication.experience
-                    }
+                    {selectedApplication.experience}
                   </Typography>
                 </Grid>
               </Grid>
 
-              {/* Skills */}
               <Typography
                 variant="h6"
                 fontWeight={600}
@@ -945,7 +820,6 @@ function Applications() {
                 )}
               </Box>
 
-              {/* Summary */}
               <Typography
                 variant="h6"
                 fontWeight={600}
@@ -961,7 +835,6 @@ function Applications() {
                 {selectedApplication.summary}
               </Typography>
 
-              {/* Resume Button */}
               <Box
                 sx={{
                   p: 2,
@@ -981,9 +854,7 @@ function Applications() {
                   }}
                 >
                   <Box>
-                    <Typography
-                      fontWeight={600}
-                    >
+                    <Typography fontWeight={600}>
                       Candidate Resume
                     </Typography>
 
@@ -1034,7 +905,6 @@ function Applications() {
         </DialogTitle>
 
         <DialogContent dividers>
-          {/* Loading State */}
           {resumeLoading && (
             <Box
               sx={{
@@ -1050,22 +920,18 @@ function Applications() {
             </Box>
           )}
 
-          {/* Available Resume */}
           {!resumeLoading &&
             resumeState === "available" &&
             resumeCandidate && (
               <Box>
-                {/* Resume Header */}
                 <Box
                   sx={{
                     mb: 2,
                     p: 2,
-                    backgroundColor:
-                      "#f5f7fa",
+                    backgroundColor: "#f5f7fa",
                     borderRadius: 2,
                     display: "flex",
-                    justifyContent:
-                      "space-between",
+                    justifyContent: "space-between",
                     alignItems: "center",
                     gap: 2,
                     flexWrap: "wrap",
@@ -1076,9 +942,7 @@ function Applications() {
                       variant="subtitle1"
                       fontWeight={600}
                     >
-                      {
-                        resumeCandidate.candidate
-                      }
+                      {resumeCandidate.candidate}
                     </Typography>
 
                     <Typography
@@ -1091,22 +955,16 @@ function Applications() {
 
                   <Button
                     variant="contained"
-                    startIcon={
-                      <DownloadIcon />
-                    }
-                    onClick={
-                      handleDownloadResume
-                    }
+                    startIcon={<DownloadIcon />}
+                    onClick={handleDownloadResume}
                   >
                     Download Resume
                   </Button>
                 </Box>
 
-                {/* Resume Preview */}
                 <Box
                   sx={{
-                    border:
-                      "1px solid #ddd",
+                    border: "1px solid #ddd",
                     borderRadius: 2,
                     overflow: "hidden",
                     backgroundColor: "#fff",
@@ -1129,18 +987,15 @@ function Applications() {
               </Box>
             )}
 
-          {/* Unsupported File State */}
           {!resumeLoading &&
-            resumeState ===
-              "unsupported" && (
+            resumeState === "unsupported" && (
               <Box
                 sx={{
                   minHeight: 300,
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
-                  justifyContent:
-                    "center",
+                  justifyContent: "center",
                   textAlign: "center",
                 }}
               >
@@ -1152,9 +1007,7 @@ function Applications() {
                   }}
                 />
 
-                <Typography
-                  variant="h6"
-                >
+                <Typography variant="h6">
                   Unsupported Resume Format
                 </Typography>
 
@@ -1163,13 +1016,12 @@ function Applications() {
                   color="text.secondary"
                   sx={{ mt: 1 }}
                 >
-                  This resume format cannot
-                  be previewed.
+                  This resume format cannot be
+                  previewed.
                 </Typography>
               </Box>
             )}
 
-          {/* Error State */}
           {!resumeLoading &&
             resumeState === "error" && (
               <Box
@@ -1178,8 +1030,7 @@ function Applications() {
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
-                  justifyContent:
-                    "center",
+                  justifyContent: "center",
                   textAlign: "center",
                 }}
               >
