@@ -214,6 +214,36 @@ const getResumeDownloadUrl = async (req, res) => {
   }
 };
 
+// @desc    Manually trigger re-parsing for an application
+// @route   POST /api/applications/:id/reanalyze
+// @access  Private (Recruiter only)
+const reanalyzeApplication = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const application = await Application.findById(id).populate('jobId');
+    if (!application) {
+      return res.status(404).json({ message: 'Application not found' });
+    }
+
+    if (application.jobId.recruiterId.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'Not authorized for this operation' });
+    }
+
+    // Trigger AI background worker again
+    triggerAIAnalysis(
+      application._id,
+      application.resumeUrl,
+      application.jobId.description,
+      application.jobId.requiredSkills
+    );
+
+    res.json({ message: 'Re-analysis triggered successfully' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   applyForJob,
   getApplicationsByJob,
@@ -221,4 +251,5 @@ module.exports = {
   getApplicationAnalysis,
   updateApplicationStatus,
   getResumeDownloadUrl,
+  reanalyzeApplication,
 };

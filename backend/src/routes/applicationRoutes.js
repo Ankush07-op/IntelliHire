@@ -8,6 +8,7 @@ const {
   updateApplicationStatus,
   getResumeDownloadUrl,
   getApplicationAnalysis,
+  reanalyzeApplication,
 } = require('../controllers/applicationController');
 const { protect, authorize } = require('../middlewares/authMiddleware');
 const { aiTriggerLimiter } = require('../middlewares/rateLimiter');
@@ -22,5 +23,6 @@ router.get('/job/:jobId', protect, authorize('recruiter'), getApplicationsByJob)
 router.patch('/:id/status', protect, authorize('recruiter'), updateApplicationStatus);
 router.get('/:id/resume', protect, getResumeDownloadUrl);
 router.get('/:id/analysis', protect, authorize('recruiter'), getApplicationAnalysis);
+router.post('/:id/reanalyze', protect, authorize('recruiter'), reanalyzeApplication);
 
 module.exports = router;

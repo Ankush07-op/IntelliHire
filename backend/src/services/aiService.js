@@ -1,41 +1,81 @@
 const axios = require('axios');
 const AIAnalysis = require('../models/AIAnalysis');
+const { getPresignedDownloadUrl } = require('./s3Service');
 
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:8000';
 
 /**
- * Triggers AI processing asynchronously for a given application
+ * Triggers AI processing with exponential backoff retry logic (up to 3 attempts)
  */
-const triggerAIAnalysis = async (applicationId, resumeUrl, jobDescription, requiredSkills) => {
-  // Run asynchronously in the background
+const triggerAIAnalysis = async (applicationId, s3Key, jobDescription, requiredSkills, retries = 3) => {
   setImmediate(async () => {
-    try {
-      console.log(`[AI Queue] Processing application: ${applicationId}`);
+    let attempt = 0;
+    let delay = 2000; // Start with 2 second delay
 
-      // Call M3's FastAPI microservice
-      const response = await axios.post(`${AI_SERVICE_URL}/api/analyze`, {
-        application_id: applicationId,
-        resume_url: resumeUrl,
-        job_description: jobDescription,
-        required_skills: requiredSkills,
-      }, { timeout: 30000 }); // 30s timeout safety net
+    while (attempt < retries) {
+      try {
+        console.log(`[AI Worker] Processing application ${applicationId} (Attempt ${attempt + 1}/${retries})`);
 
-      const { score, matchedSkills, missingSkills, experienceYears, summary } = response.data;
+        // Generate short-lived pre-signed URL so Python service can download the PDF/DOCX from S3
+        const temporaryResumeUrl = await getPresignedDownloadUrl(s3Key);
 
-      // Save AI result to MongoDB mapped to the application record
-      await AIAnalysis.create({
-        applicationId,
-        score,
-        matchedSkills,
-        missingSkills,
-        experienceYears,
-        summary,
-      });
+        // Call FastAPI microservice
+        const response = await axios.post(
+          `${AI_SERVICE_URL}/api/analyze`,
+          {
+            application_id: applicationId,
+            resume_url: temporaryResumeUrl,
+            job_description: jobDescription,
+            required_skills: requiredSkills,
+          },
+          { timeout: 45000 } // 45s safety timeout for LLM response
+        );
 
-      console.log(`[AI Queue] Analysis complete for application: ${applicationId}`);
-    } catch (error) {
-      console.error(`[AI Queue Error] Failed for application ${applicationId}:`, error.message);
-      // Optional: Log failure state or retry logic (M2 task)
+        const { score, matchedSkills, missingSkills, experienceYears, summary } = response.data;
+
+        // Save or update AI Analysis record in MongoDB
+        await AIAnalysis.findOneAndUpdate(
+          { applicationId },
+          {
+            applicationId,
+            score,
+            matchedSkills,
+            missingSkills,
+            experienceYears,
+            summary,
+            status: 'completed',
+          },
+          { upsert: true, new: true }
+        );
+
+        console.log(`[AI Worker Success] Application ${applicationId} parsed successfully.`);
+        return; // Exit retry loop on success
+      } catch (error) {
+        attempt++;
+        console.error(`[AI Worker Error] Attempt ${attempt} failed for application ${applicationId}:`, error.message);
+
+        if (attempt < retries) {
+          // Exponential backoff wait
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          delay *= 2; 
+        } else {
+          // Final Failure Handler - Mark in database so recruiter sees "Failed to Process"
+          await AIAnalysis.findOneAndUpdate(
+            { applicationId },
+            {
+              applicationId,
+              score: 0,
+              matchedSkills: [],
+              missingSkills: [],
+              experienceYears: 0,
+              summary: 'Automated AI parsing failed after multiple attempts. Manual review required.',
+              status: 'failed',
+            },
+            { upsert: true }
+          );
+          console.error(`[AI Worker Terminated] Max retries reached for application ${applicationId}.`);
+        }
+      }
     }
   });
 };
