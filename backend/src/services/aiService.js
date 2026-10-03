@@ -1,6 +1,5 @@
 const axios = require('axios');
 const AIAnalysis = require('../models/AIAnalysis');
-const { getPresignedDownloadUrl } = require('./s3Service');
 
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:8000';
 

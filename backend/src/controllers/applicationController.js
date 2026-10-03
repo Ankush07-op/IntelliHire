@@ -3,18 +3,22 @@ const Job = require('../models/Job');
 const { triggerAIAnalysis } = require('../services/aiService');
 const AIAnalysis = require('../models/AIAnalysis');
 const { sendStatusUpdateEmail, sendInterviewInviteEmail } = require('../services/emailService');
-const { uploadToS3 } = require('../services/s3Service');
-const { getPresignedDownloadUrl } = require('../services/s3Service');
+const { uploadToCloudinary } = require('../services/cloudinaryService');
 
 // @desc    Submit a new job application
 // @route   POST /api/applications
 // @access  Private (Applicant only)
 const applyForJob = async (req, res) => {
   try {
-    const { jobId, resumeUrl } = req.body;
+    const { jobId } = req.body;
+    const file = req.file; // Multer buffer
 
-    if (!jobId || !resumeUrl) {
-      return res.status(400).json({ message: 'Job ID and resume URL are required' });
+    if (!jobId) {
+      return res.status(400).json({ message: 'Job ID is required' });
+    }
+
+    if (!file) {
+      return res.status(400).json({ message: 'Please upload a resume file (PDF or DOCX)' });
     }
 
     // Verify job exists and is active
@@ -33,20 +37,20 @@ const applyForJob = async (req, res) => {
       return res.status(400).json({ message: 'You have already applied for this position' });
     }
 
-    // Upload file buffer to AWS S3 and get key
-    const s3Key = await uploadToS3(file);
+    // Upload file buffer to Cloudinary and get public ID
+    const publicId = await uploadToCloudinary(file);
 
     // Save Application record in MongoDB
     const application = await Application.create({
       jobId,
       applicantId: req.user.id,
-      resumeUrl: s3Key, // Storing S3 key
+      resumeUrl: publicId, // Storing Cloudinary public ID
     });
 
     // Trigger AI Analysis Asynchronously (Non-blocking)
     triggerAIAnalysis(
       application._id,
-      s3Key,
+      publicId,
       job.description,
       job.requiredSkills
     );

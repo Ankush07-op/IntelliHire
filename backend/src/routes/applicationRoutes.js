@@ -7,7 +7,6 @@ const {
   getApplicationAnalysis,
   updateApplicationStatus,
   getResumeDownloadUrl,
-  getApplicationAnalysis,
   reanalyzeApplication,
 } = require('../controllers/applicationController');
 const { protect, authorize } = require('../middlewares/authMiddleware');
