@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-
 import {
   Alert,
   Box,
@@ -26,7 +25,6 @@ import {
   TableRow,
   Typography,
 } from "@mui/material";
-
 import PeopleIcon from "@mui/icons-material/People";
 import PendingActionsIcon from "@mui/icons-material/PendingActions";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
@@ -34,43 +32,29 @@ import CancelIcon from "@mui/icons-material/Cancel";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import DescriptionIcon from "@mui/icons-material/Description";
 import DownloadIcon from "@mui/icons-material/Download";
-
+import AIEvaluationCard from "../../components/ai/AIEvaluationCard";
 import { getApplications } from "../../services/applicationStore";
-
 function Applications() {
   const [selectedJob, setSelectedJob] = useState("all");
-
   const [applications, setApplications] = useState(
     getApplications()
   );
-
   const [selectedApplication, setSelectedApplication] =
     useState(null);
-
   const [resumeOpen, setResumeOpen] = useState(false);
   const [resumeLoading, setResumeLoading] = useState(false);
   const [resumeState, setResumeState] = useState("available");
   const [resumeCandidate, setResumeCandidate] = useState(null);
-
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
-
-  /*
-   * Listen for application changes made from Kanban.
-   *
-   * Kanban updates the shared application store and
-   * dispatches the "applicationsUpdated" event.
-   */
   useEffect(() => {
     const handleApplicationsUpdated = (event) => {
       setApplications(event.detail);
     };
-
     window.addEventListener(
       "applicationsUpdated",
       handleApplicationsUpdated
     );
-
     return () => {
       window.removeEventListener(
         "applicationsUpdated",
@@ -78,56 +62,39 @@ function Applications() {
       );
     };
   }, []);
-
-  /*
-   * Keep the page synchronized when the browser tab
-   * becomes active again.
-   */
   useEffect(() => {
     const handleFocus = () => {
       setApplications(getApplications());
     };
-
     window.addEventListener("focus", handleFocus);
-
     return () => {
       window.removeEventListener("focus", handleFocus);
     };
   }, []);
-
   const totalApplications = applications.length;
-
   const pendingApplications = applications.filter(
     (application) => application.status === "Pending"
   ).length;
-
   const shortlistedApplications = applications.filter(
     (application) => application.status === "Shortlisted"
   ).length;
-
   const rejectedApplications = applications.filter(
     (application) => application.status === "Rejected"
   ).length;
-
   const getStatusColor = (status) => {
     switch (status) {
       case "Shortlisted":
         return "success";
-
       case "Interview":
         return "info";
-
       case "Rejected":
         return "error";
-
       case "Pending":
         return "warning";
-
       default:
         return "default";
     }
   };
-
   const filteredApplications =
     selectedJob === "all"
       ? applications
@@ -136,24 +103,17 @@ function Applications() {
             application.job.toLowerCase() ===
             selectedJob.toLowerCase()
         );
-
   const handleViewApplication = (application) => {
     setSelectedApplication(application);
   };
-
   const handleCloseDetails = () => {
     setSelectedApplication(null);
   };
-
-  /*
-   * Open resume preview.
-   */
   const handleViewResume = (application) => {
     setResumeCandidate(application);
     setResumeOpen(true);
     setResumeLoading(true);
     setResumeState("available");
-
     setTimeout(() => {
       setResumeLoading(false);
       setResumeState(
@@ -161,17 +121,12 @@ function Applications() {
       );
     }, 700);
   };
-
   const handleCloseResume = () => {
     setResumeOpen(false);
     setResumeCandidate(null);
     setResumeLoading(false);
     setResumeState("available");
   };
-
-  /*
-   * Generates a temporary HTML resume for demo purposes.
-   */
   const getResumeHtml = (application) => {
     return `
       <!DOCTYPE html>
@@ -179,7 +134,6 @@ function Applications() {
         <head>
           <meta charset="UTF-8" />
           <title>${application.candidate} Resume</title>
-
           <style>
             body {
               font-family: Arial, sans-serif;
@@ -189,29 +143,24 @@ function Applications() {
               max-width: 850px;
               margin: auto;
             }
-
             h1 {
               margin-bottom: 5px;
               font-size: 30px;
             }
-
             .contact {
               color: #666;
               margin-bottom: 25px;
             }
-
             h2 {
               border-bottom: 1px solid #ddd;
               padding-bottom: 5px;
               margin-top: 25px;
             }
-
             .skills {
               display: flex;
               flex-wrap: wrap;
               gap: 8px;
             }
-
             .skill {
               background: #f0f2f5;
               padding: 5px 10px;
@@ -219,10 +168,8 @@ function Applications() {
             }
           </style>
         </head>
-
         <body>
           <h1>${application.candidate}</h1>
-
           <div class="contact">
             ${application.email}
             |
@@ -230,27 +177,19 @@ function Applications() {
             |
             ${application.location || "Not provided"}
           </div>
-
           <h2>Professional Summary</h2>
-
           <p>
             ${application.summary || "Not provided"}
           </p>
-
           <h2>Education</h2>
-
           <p>
             ${application.education || "Not provided"}
           </p>
-
           <h2>Experience</h2>
-
           <p>
             ${application.experience || "Not provided"}
           </p>
-
           <h2>Skills</h2>
-
           <div class="skills">
             ${(application.skills || [])
               .map(
@@ -263,10 +202,6 @@ function Applications() {
       </html>
     `;
   };
-
-  /*
-   * Download temporary demo resume.
-   */
   const handleDownloadResume = () => {
     if (
       !resumeCandidate ||
@@ -274,39 +209,26 @@ function Applications() {
     ) {
       return;
     }
-
     const resumeHtml = getResumeHtml(resumeCandidate);
-
     const blob = new Blob([resumeHtml], {
       type: "text/html",
     });
-
     const url = URL.createObjectURL(blob);
-
     const link = document.createElement("a");
-
     link.href = url;
-
     link.download = `${resumeCandidate.candidate.replace(
       /\s+/g,
       "_"
     )}_Resume.html`;
-
     document.body.appendChild(link);
-
     link.click();
-
     document.body.removeChild(link);
-
     URL.revokeObjectURL(url);
-
     setSnackbarMessage(
       "Resume downloaded successfully"
     );
-
     setSnackbarOpen(true);
   };
-
   return (
     <>
       {/* Page Header */}
@@ -318,7 +240,6 @@ function Applications() {
         >
           Applications
         </Typography>
-
         <Typography
           variant="body1"
           color="text.secondary"
@@ -326,7 +247,6 @@ function Applications() {
           Manage and review candidate applications
         </Typography>
       </Box>
-
       {/* Statistics Cards */}
       <Grid
         container
@@ -351,7 +271,6 @@ function Applications() {
                   >
                     Total Applications
                   </Typography>
-
                   <Typography
                     variant="h4"
                     fontWeight={700}
@@ -360,7 +279,6 @@ function Applications() {
                     {totalApplications}
                   </Typography>
                 </Box>
-
                 <PeopleIcon
                   sx={{
                     fontSize: 40,
@@ -371,7 +289,6 @@ function Applications() {
             </CardContent>
           </Card>
         </Grid>
-
         {/* Pending */}
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <Card>
@@ -390,7 +307,6 @@ function Applications() {
                   >
                     Pending
                   </Typography>
-
                   <Typography
                     variant="h4"
                     fontWeight={700}
@@ -399,7 +315,6 @@ function Applications() {
                     {pendingApplications}
                   </Typography>
                 </Box>
-
                 <PendingActionsIcon
                   sx={{
                     fontSize: 40,
@@ -410,7 +325,6 @@ function Applications() {
             </CardContent>
           </Card>
         </Grid>
-
         {/* Shortlisted */}
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <Card>
@@ -429,7 +343,6 @@ function Applications() {
                   >
                     Shortlisted
                   </Typography>
-
                   <Typography
                     variant="h4"
                     fontWeight={700}
@@ -438,7 +351,6 @@ function Applications() {
                     {shortlistedApplications}
                   </Typography>
                 </Box>
-
                 <CheckCircleIcon
                   sx={{
                     fontSize: 40,
@@ -449,7 +361,6 @@ function Applications() {
             </CardContent>
           </Card>
         </Grid>
-
         {/* Rejected */}
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <Card>
@@ -468,7 +379,6 @@ function Applications() {
                   >
                     Rejected
                   </Typography>
-
                   <Typography
                     variant="h4"
                     fontWeight={700}
@@ -477,7 +387,6 @@ function Applications() {
                     {rejectedApplications}
                   </Typography>
                 </Box>
-
                 <CancelIcon
                   sx={{
                     fontSize: 40,
@@ -489,7 +398,6 @@ function Applications() {
           </Card>
         </Grid>
       </Grid>
-
       {/* Applications Table */}
       <Card>
         <CardContent>
@@ -509,7 +417,6 @@ function Applications() {
             >
               Candidate Applications
             </Typography>
-
             <FormControl
               size="small"
               sx={{ minWidth: 220 }}
@@ -517,7 +424,6 @@ function Applications() {
               <InputLabel>
                 Filter by Job
               </InputLabel>
-
               <Select
                 value={selectedJob}
                 label="Filter by Job"
@@ -528,22 +434,18 @@ function Applications() {
                 <MenuItem value="all">
                   All Jobs
                 </MenuItem>
-
                 <MenuItem value="frontend developer">
                   Frontend Developer
                 </MenuItem>
-
                 <MenuItem value="backend developer">
                   Backend Developer
                 </MenuItem>
-
                 <MenuItem value="full stack developer">
                   Full Stack Developer
                 </MenuItem>
               </Select>
             </FormControl>
           </Box>
-
           <TableContainer
             component={Paper}
             variant="outlined"
@@ -554,29 +456,23 @@ function Applications() {
                   <TableCell>
                     <strong>Candidate</strong>
                   </TableCell>
-
                   <TableCell>
                     <strong>Email</strong>
                   </TableCell>
-
                   <TableCell>
                     <strong>Job</strong>
                   </TableCell>
-
                   <TableCell>
                     <strong>Applied Date</strong>
                   </TableCell>
-
                   <TableCell>
                     <strong>Status</strong>
                   </TableCell>
-
                   <TableCell align="center">
                     <strong>Action</strong>
                   </TableCell>
                 </TableRow>
               </TableHead>
-
               <TableBody>
                 {filteredApplications.map(
                   (application) => (
@@ -589,19 +485,15 @@ function Applications() {
                           {application.candidate}
                         </Typography>
                       </TableCell>
-
                       <TableCell>
                         {application.email}
                       </TableCell>
-
                       <TableCell>
                         {application.job}
                       </TableCell>
-
                       <TableCell>
                         {application.appliedDate}
                       </TableCell>
-
                       <TableCell>
                         <Chip
                           label={application.status}
@@ -611,7 +503,6 @@ function Applications() {
                           size="small"
                         />
                       </TableCell>
-
                       <TableCell align="center">
                         <Button
                           size="small"
@@ -631,7 +522,6 @@ function Applications() {
                     </TableRow>
                   )
                 )}
-
                 {filteredApplications.length === 0 && (
                   <TableRow>
                     <TableCell
@@ -652,7 +542,6 @@ function Applications() {
           </TableContainer>
         </CardContent>
       </Card>
-
       {/* Candidate Details Dialog */}
       <Dialog
         open={Boolean(selectedApplication)}
@@ -663,7 +552,6 @@ function Applications() {
         <DialogTitle>
           Candidate Details
         </DialogTitle>
-
         <DialogContent dividers>
           {selectedApplication && (
             <>
@@ -674,7 +562,6 @@ function Applications() {
                 >
                   {selectedApplication.candidate}
                 </Typography>
-
                 <Typography
                   variant="body2"
                   color="text.secondary"
@@ -682,7 +569,6 @@ function Applications() {
                   {selectedApplication.email}
                 </Typography>
               </Box>
-
               <Typography
                 variant="h6"
                 fontWeight={600}
@@ -690,7 +576,6 @@ function Applications() {
               >
                 Application Information
               </Typography>
-
               <Grid
                 container
                 spacing={2}
@@ -703,12 +588,10 @@ function Applications() {
                   >
                     Applied For
                   </Typography>
-
                   <Typography fontWeight={600}>
                     {selectedApplication.job}
                   </Typography>
                 </Grid>
-
                 <Grid size={{ xs: 12, sm: 6 }}>
                   <Typography
                     variant="body2"
@@ -716,12 +599,10 @@ function Applications() {
                   >
                     Applied Date
                   </Typography>
-
                   <Typography fontWeight={600}>
                     {selectedApplication.appliedDate}
                   </Typography>
                 </Grid>
-
                 <Grid size={{ xs: 12, sm: 6 }}>
                   <Typography
                     variant="body2"
@@ -729,7 +610,6 @@ function Applications() {
                   >
                     Status
                   </Typography>
-
                   <Chip
                     label={selectedApplication.status}
                     color={getStatusColor(
@@ -739,7 +619,6 @@ function Applications() {
                     sx={{ mt: 0.5 }}
                   />
                 </Grid>
-
                 <Grid size={{ xs: 12, sm: 6 }}>
                   <Typography
                     variant="body2"
@@ -747,12 +626,10 @@ function Applications() {
                   >
                     Phone
                   </Typography>
-
                   <Typography fontWeight={600}>
                     {selectedApplication.phone}
                   </Typography>
                 </Grid>
-
                 <Grid size={{ xs: 12, sm: 6 }}>
                   <Typography
                     variant="body2"
@@ -760,12 +637,10 @@ function Applications() {
                   >
                     Location
                   </Typography>
-
                   <Typography fontWeight={600}>
                     {selectedApplication.location}
                   </Typography>
                 </Grid>
-
                 <Grid size={{ xs: 12, sm: 6 }}>
                   <Typography
                     variant="body2"
@@ -773,12 +648,10 @@ function Applications() {
                   >
                     Education
                   </Typography>
-
                   <Typography fontWeight={600}>
                     {selectedApplication.education}
                   </Typography>
                 </Grid>
-
                 <Grid size={{ xs: 12, sm: 6 }}>
                   <Typography
                     variant="body2"
@@ -786,13 +659,11 @@ function Applications() {
                   >
                     Experience
                   </Typography>
-
                   <Typography fontWeight={600}>
                     {selectedApplication.experience}
                   </Typography>
                 </Grid>
               </Grid>
-
               <Typography
                 variant="h6"
                 fontWeight={600}
@@ -800,7 +671,6 @@ function Applications() {
               >
                 Skills
               </Typography>
-
               <Box
                 sx={{
                   display: "flex",
@@ -819,7 +689,6 @@ function Applications() {
                   )
                 )}
               </Box>
-
               <Typography
                 variant="h6"
                 fontWeight={600}
@@ -827,14 +696,18 @@ function Applications() {
               >
                 Application Summary
               </Typography>
-
               <Typography
                 color="text.secondary"
                 sx={{ mb: 3 }}
               >
                 {selectedApplication.summary}
               </Typography>
-
+              {/* AI Candidate Evaluation */}
+              <Box sx={{ mb: 3 }}>
+                <AIEvaluationCard
+                  candidate={selectedApplication}
+                />
+              </Box>
               <Box
                 sx={{
                   p: 2,
@@ -857,7 +730,6 @@ function Applications() {
                     <Typography fontWeight={600}>
                       Candidate Resume
                     </Typography>
-
                     <Typography
                       variant="body2"
                       color="text.secondary"
@@ -866,7 +738,6 @@ function Applications() {
                       candidate resume
                     </Typography>
                   </Box>
-
                   <Button
                     variant="contained"
                     startIcon={
@@ -885,14 +756,12 @@ function Applications() {
             </>
           )}
         </DialogContent>
-
         <DialogActions>
           <Button onClick={handleCloseDetails}>
             Close
           </Button>
         </DialogActions>
       </Dialog>
-
       {/* Resume Preview Dialog */}
       <Dialog
         open={resumeOpen}
@@ -903,7 +772,6 @@ function Applications() {
         <DialogTitle>
           Resume Preview
         </DialogTitle>
-
         <DialogContent dividers>
           {resumeLoading && (
             <Box
@@ -919,7 +787,6 @@ function Applications() {
               </Typography>
             </Box>
           )}
-
           {!resumeLoading &&
             resumeState === "available" &&
             resumeCandidate && (
@@ -944,7 +811,6 @@ function Applications() {
                     >
                       {resumeCandidate.candidate}
                     </Typography>
-
                     <Typography
                       variant="body2"
                       color="text.secondary"
@@ -952,7 +818,6 @@ function Applications() {
                       Demo resume preview
                     </Typography>
                   </Box>
-
                   <Button
                     variant="contained"
                     startIcon={<DownloadIcon />}
@@ -961,7 +826,6 @@ function Applications() {
                     Download Resume
                   </Button>
                 </Box>
-
                 <Box
                   sx={{
                     border: "1px solid #ddd",
@@ -986,7 +850,6 @@ function Applications() {
                 </Box>
               </Box>
             )}
-
           {!resumeLoading &&
             resumeState === "unsupported" && (
               <Box
@@ -1006,11 +869,9 @@ function Applications() {
                     mb: 2,
                   }}
                 />
-
                 <Typography variant="h6">
                   Unsupported Resume Format
                 </Typography>
-
                 <Typography
                   variant="body2"
                   color="text.secondary"
@@ -1021,7 +882,6 @@ function Applications() {
                 </Typography>
               </Box>
             )}
-
           {!resumeLoading &&
             resumeState === "error" && (
               <Box
@@ -1040,7 +900,6 @@ function Applications() {
                 >
                   Unable to Load Resume
                 </Typography>
-
                 <Typography
                   variant="body2"
                   color="text.secondary"
@@ -1053,14 +912,12 @@ function Applications() {
               </Box>
             )}
         </DialogContent>
-
         <DialogActions>
           <Button onClick={handleCloseResume}>
             Close
           </Button>
         </DialogActions>
       </Dialog>
-
       {/* Snackbar */}
       <Snackbar
         open={snackbarOpen}
@@ -1086,5 +943,4 @@ function Applications() {
     </>
   );
 }
-
 export default Applications;
