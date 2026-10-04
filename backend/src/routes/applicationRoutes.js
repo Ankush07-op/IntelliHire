@@ -14,7 +14,7 @@ const { aiTriggerLimiter } = require('../middlewares/rateLimiter');
 const upload = require('../middlewares/uploadMiddleware');
 
 // Applicant routes
-router.post('/', protect, authorize('applicant'), aiTriggerLimiter, upload.single('resume'), applyForJob);
+router.post('/', protect, authorize('applicant'), aiTriggerLimiter, upload.handleUpload, applyForJob);
 router.get('/me', protect, authorize('applicant'), getMyApplications);
 
 // Recruiter route
