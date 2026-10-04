@@ -1,6 +1,9 @@
 from fastapi import FastAPI, File, HTTPException, UploadFile
 
-from app.llm_matcher import extract_skills_with_gemini
+from app.llm_matcher import (
+    extract_skills_with_gemini,
+    match_resume_with_gemini,
+)
 from app.parser import parse_resume
 
 
@@ -132,6 +135,82 @@ async def ai_extract_resume_skills(file: UploadFile = File(...)):
         raise HTTPException(
             status_code=500,
             detail=f"AI resume processing failed: {str(exc)}",
+        ) from exc
+
+    finally:
+        import os
+
+        if os.path.exists(temp_file):
+            os.remove(temp_file)
+
+
+@app.post("/api/resume/match")
+async def match_resume_endpoint(
+    file: UploadFile = File(...),
+    job_description: str = "",
+):
+    if not file.filename:
+        raise HTTPException(
+            status_code=400,
+            detail="Resume file is required.",
+        )
+
+    if not job_description.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="Job description is required.",
+        )
+
+    allowed_extensions = {".pdf", ".docx"}
+
+    filename = file.filename.lower()
+
+    if not any(
+        filename.endswith(extension)
+        for extension in allowed_extensions
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="Only PDF and DOCX resume files are supported.",
+        )
+
+    temp_file = f"temp_{file.filename}"
+
+    try:
+        content = await file.read()
+
+        with open(temp_file, "wb") as output_file:
+            output_file.write(content)
+
+        parsed_resume = parse_resume(temp_file)
+
+        match_result = match_resume_with_gemini(
+            parsed_resume["raw_text"],
+            job_description,
+        )
+
+        return {
+            "success": True,
+            "filename": file.filename,
+            "match": match_result,
+        }
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+        ) from exc
+
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=str(exc),
+        ) from exc
+
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Resume matching failed: {str(exc)}",
         ) from exc
 
     finally:
