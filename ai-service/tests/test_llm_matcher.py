@@ -93,3 +93,62 @@ def test_match_resume_with_gemini(mock_get_client):
     assert result["summary"] == "Strong candidate match."
 
     mock_client.models.generate_content.assert_called_once()
+
+
+def test_strong_data_analyst_match():
+    result = ResumeMatchResponse(
+        match_score=85,
+        matched_skills=[
+            "SQL",
+            "Power BI",
+            "Microsoft Excel",
+            "Data Analysis",
+            "Automated Reporting",
+            "Financial Dashboards",
+        ],
+        missing_skills=[],
+        summary="The candidate is a strong match for the Data Analyst role.",
+    )
+
+    assert result.match_score >= 75
+    assert "SQL" in result.matched_skills
+    assert "Power BI" in result.matched_skills
+    assert result.missing_skills == []
+
+
+def test_poor_full_stack_match():
+    result = ResumeMatchResponse(
+        match_score=10,
+        matched_skills=[],
+        missing_skills=[
+            "Full Stack Development",
+            "Frontend Development",
+            "Backend Development",
+            "JavaScript",
+            "HTML/CSS",
+        ],
+        summary="The candidate is a poor match for this role.",
+    )
+
+    assert result.match_score < 40
+    assert result.matched_skills == []
+    assert "JavaScript" in result.missing_skills
+
+
+def test_no_match_network_security_role():
+    result = ResumeMatchResponse(
+        match_score=0,
+        matched_skills=[],
+        missing_skills=[
+            "Network Security",
+            "Firewalls",
+            "VPN",
+            "IDS/IPS",
+            "Security Information and Event Management",
+        ],
+        summary="The candidate is a poor match for this role.",
+    )
+
+    assert result.match_score < 40
+    assert result.matched_skills == []
+    assert "Network Security" in result.missing_skills
