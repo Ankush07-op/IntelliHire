@@ -25,8 +25,10 @@ const rankingRoutes = require('./src/routes/rankingRoutes');
 
 const app = express();
 
-// Connect to MongoDB
-connectDB();
+// Connect to MongoDB (skip in test environment to allow in-memory DB)
+if (process.env.NODE_ENV !== 'test') {
+  connectDB();
+}
 
 // CORS Configuration
 const allowedOrigins = [
@@ -81,15 +83,20 @@ app.use(notFound);
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
-const server = app.listen(PORT, () => console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`));
+let server;
+if (process.env.NODE_ENV !== 'test') {
+  server = app.listen(PORT, () => console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`));
 
-// Graceful Shutdown
-process.on('SIGTERM', () => {
-  console.log('SIGTERM received. Shutting down gracefully...');
-  server.close(() => {
-    mongoose.connection.close(false, () => {
-      console.log('MongoDB connection closed.');
-      process.exit(0);
+  // Graceful Shutdown
+  process.on('SIGTERM', () => {
+    console.log('SIGTERM received. Shutting down gracefully...');
+    server.close(() => {
+      mongoose.connection.close(false, () => {
+        console.log('MongoDB connection closed.');
+        process.exit(0);
+      });
     });
   });
-});
+}
+
+module.exports = app;

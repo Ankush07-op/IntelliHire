@@ -3,7 +3,7 @@ const Job = require('../models/Job');
 const { triggerAIAnalysis } = require('../services/aiService');
 const AIAnalysis = require('../models/AIAnalysis');
 const { sendStatusUpdateEmail, sendInterviewInviteEmail } = require('../services/emailService');
-const { uploadToCloudinary } = require('../services/cloudinaryService');
+const { uploadToCloudinary, getPresignedDownloadUrl } = require('../services/cloudinaryService');
 
 // @desc    Submit a new job application
 // @route   POST /api/applications

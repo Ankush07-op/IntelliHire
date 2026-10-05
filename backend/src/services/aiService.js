@@ -1,12 +1,13 @@
 const axios = require('axios');
 const AIAnalysis = require('../models/AIAnalysis');
+const { getPresignedDownloadUrl } = require('./cloudinaryService');
 
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:8000';
 
 /**
  * Triggers AI processing with exponential backoff retry logic (up to 3 attempts)
  */
-const triggerAIAnalysis = async (applicationId, s3Key, jobDescription, requiredSkills, retries = 3) => {
+const triggerAIAnalysis = async (applicationId, publicId, jobDescription, requiredSkills, retries = 3) => {
   setImmediate(async () => {
     let attempt = 0;
     let delay = 2000; // Start with 2 second delay
@@ -15,8 +16,8 @@ const triggerAIAnalysis = async (applicationId, s3Key, jobDescription, requiredS
       try {
         console.log(`[AI Worker] Processing application ${applicationId} (Attempt ${attempt + 1}/${retries})`);
 
-        // Generate short-lived pre-signed URL so Python service can download the PDF/DOCX from S3
-        const temporaryResumeUrl = await getPresignedDownloadUrl(s3Key);
+        // Generate short-lived signed URL so Python service can download the PDF/DOCX from Cloudinary
+        const temporaryResumeUrl = await getPresignedDownloadUrl(publicId);
 
         // Call FastAPI microservice
         const response = await axios.post(
