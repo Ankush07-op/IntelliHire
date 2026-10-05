@@ -1,0 +1,577 @@
+import {
+  Alert,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  FormControl,
+  Grid,
+  InputLabel,
+  MenuItem,
+  Select,
+  Snackbar,
+  TextField,
+  Typography,
+} from "@mui/material";
+
+import AddIcon from "@mui/icons-material/Add";
+import WorkIcon from "@mui/icons-material/Work";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import ArchiveIcon from "@mui/icons-material/Archive";
+import LocationOnIcon from "@mui/icons-material/LocationOn";
+
+import { useState } from "react";
+
+function Jobs() {
+  const [openDialog, setOpenDialog] = useState(false);
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState("");
+
+  const [jobs, setJobs] = useState([]);
+  const [editingJobId, setEditingJobId] = useState(null);
+
+  const [job, setJob] = useState({
+    title: "",
+    department: "",
+    location: "",
+    employmentType: "",
+    description: "",
+    skills: "",
+  });
+
+  const handleOpenDialog = () => {
+    setEditingJobId(null);
+
+    setJob({
+      title: "",
+      department: "",
+      location: "",
+      employmentType: "",
+      description: "",
+      skills: "",
+    });
+
+    setOpenDialog(true);
+  };
+
+  const handleCloseDialog = () => {
+    setOpenDialog(false);
+    setEditingJobId(null);
+  };
+
+  const handleChange = (event) => {
+    const { name, value } = event.target;
+
+    setJob((previousJob) => ({
+      ...previousJob,
+      [name]: value,
+    }));
+  };
+
+  const handleCreateJob = (event) => {
+    event.preventDefault();
+
+    const newJob = {
+      id: Date.now(),
+      ...job,
+      status: "Active",
+    };
+
+    setJobs((previousJobs) => [...previousJobs, newJob]);
+
+    setOpenDialog(false);
+    setSnackbarMessage("Job created successfully.");
+    setSnackbarOpen(true);
+
+    setJob({
+      title: "",
+      department: "",
+      location: "",
+      employmentType: "",
+      description: "",
+      skills: "",
+    });
+  };
+
+  const handleEditJob = (jobToEdit) => {
+    setJob({
+      title: jobToEdit.title,
+      department: jobToEdit.department,
+      location: jobToEdit.location,
+      employmentType: jobToEdit.employmentType,
+      description: jobToEdit.description,
+      skills: jobToEdit.skills,
+    });
+
+    setEditingJobId(jobToEdit.id);
+    setOpenDialog(true);
+  };
+
+  const handleUpdateJob = (event) => {
+    event.preventDefault();
+
+    setJobs((previousJobs) =>
+      previousJobs.map((item) =>
+        item.id === editingJobId
+          ? {
+              ...item,
+              ...job,
+            }
+          : item
+      )
+    );
+
+    setOpenDialog(false);
+    setEditingJobId(null);
+    setSnackbarMessage("Job updated successfully.");
+    setSnackbarOpen(true);
+
+    setJob({
+      title: "",
+      department: "",
+      location: "",
+      employmentType: "",
+      description: "",
+      skills: "",
+    });
+  };
+
+  const handleArchiveJob = (jobId) => {
+    setJobs((previousJobs) =>
+      previousJobs.map((item) =>
+        item.id === jobId
+          ? {
+              ...item,
+              status: "Archived",
+            }
+          : item
+      )
+    );
+
+    setSnackbarMessage("Job archived successfully.");
+    setSnackbarOpen(true);
+  };
+
+  const activeJobs = jobs.filter(
+    (item) => item.status === "Active"
+  ).length;
+
+  const archivedJobs = jobs.filter(
+    (item) => item.status === "Archived"
+  ).length;
+
+  return (
+    <Box>
+      {/* Page Header */}
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          mb: 3,
+        }}
+      >
+        <Box>
+          <Typography variant="h4" fontWeight={600}>
+            Jobs
+          </Typography>
+
+          <Typography
+            variant="body1"
+            color="text.secondary"
+            sx={{ mt: 0.5 }}
+          >
+            Manage your recruitment jobs and openings.
+          </Typography>
+        </Box>
+
+        <Button
+          variant="contained"
+          startIcon={<AddIcon />}
+          size="large"
+          onClick={handleOpenDialog}
+        >
+          Create Job
+        </Button>
+      </Box>
+
+      {/* Job Statistics */}
+      <Grid container spacing={3} sx={{ mb: 4 }}>
+        <Grid xs={12} sm={4}>
+          <Card>
+            <CardContent>
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 2,
+                }}
+              >
+                <WorkIcon color="primary" />
+
+                <Box>
+                  <Typography color="text.secondary">
+                    Total Jobs
+                  </Typography>
+
+                  <Typography variant="h4" fontWeight={600}>
+                    {jobs.length}
+                  </Typography>
+                </Box>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        <Grid xs={12} sm={4}>
+          <Card>
+            <CardContent>
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 2,
+                }}
+              >
+                <CheckCircleIcon color="success" />
+
+                <Box>
+                  <Typography color="text.secondary">
+                    Active Jobs
+                  </Typography>
+
+                  <Typography variant="h4" fontWeight={600}>
+                    {activeJobs}
+                  </Typography>
+                </Box>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        <Grid xs={12} sm={4}>
+          <Card>
+            <CardContent>
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 2,
+                }}
+              >
+                <ArchiveIcon color="action" />
+
+                <Box>
+                  <Typography color="text.secondary">
+                    Archived Jobs
+                  </Typography>
+
+                  <Typography variant="h4" fontWeight={600}>
+                    {archivedJobs}
+                  </Typography>
+                </Box>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+
+      {/* Job Listings */}
+      <Box>
+        {jobs.length === 0 ? (
+          <Card>
+            <CardContent>
+              <Typography variant="h6" fontWeight={600}>
+                Job Listings
+              </Typography>
+
+              <Typography
+                color="text.secondary"
+                sx={{ mt: 1 }}
+              >
+                No jobs have been created yet.
+              </Typography>
+            </CardContent>
+          </Card>
+        ) : (
+          <Grid container spacing={3}>
+            {jobs.map((item) => (
+              <Grid xs={12} md={6} key={item.id}>
+                <Card>
+                  <CardContent>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "flex-start",
+                        gap: 2,
+                      }}
+                    >
+                      <Box>
+                        <Typography
+                          variant="h6"
+                          fontWeight={600}
+                        >
+                          {item.title}
+                        </Typography>
+
+                        <Typography
+                          color="text.secondary"
+                          sx={{ mt: 0.5 }}
+                        >
+                          {item.department}
+                        </Typography>
+                      </Box>
+
+                      <Chip
+                        label={item.status}
+                        color={
+                          item.status === "Active"
+                            ? "success"
+                            : "default"
+                        }
+                        size="small"
+                      />
+                    </Box>
+
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1,
+                        mt: 2,
+                      }}
+                    >
+                      <LocationOnIcon
+                        fontSize="small"
+                        color="action"
+                      />
+
+                      <Typography variant="body2">
+                        {item.location}
+                      </Typography>
+                    </Box>
+
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ mt: 1 }}
+                    >
+                      {item.employmentType}
+                    </Typography>
+
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        mt: 2,
+                        display: "-webkit-box",
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: "vertical",
+                        overflow: "hidden",
+                      }}
+                    >
+                      {item.description}
+                    </Typography>
+
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ mt: 2 }}
+                    >
+                      Skills: {item.skills}
+                    </Typography>
+
+                    {/* Job Actions */}
+                    <Box
+                      sx={{
+                        display: "flex",
+                        gap: 1,
+                        mt: 3,
+                      }}
+                    >
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => handleEditJob(item)}
+                      >
+                        Edit
+                      </Button>
+
+                      {item.status === "Active" && (
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          color="warning"
+                          onClick={() =>
+                            handleArchiveJob(item.id)
+                          }
+                        >
+                          Archive
+                        </Button>
+                      )}
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+        )}
+      </Box>
+
+      {/* Create / Edit Job Dialog */}
+      <Dialog
+        open={openDialog}
+        onClose={handleCloseDialog}
+        fullWidth
+        maxWidth="md"
+      >
+        <Box
+          component="form"
+          onSubmit={
+            editingJobId
+              ? handleUpdateJob
+              : handleCreateJob
+          }
+        >
+          <DialogTitle>
+            {editingJobId
+              ? "Edit Job"
+              : "Create New Job"}
+          </DialogTitle>
+
+          <DialogContent dividers>
+            <Grid container spacing={2} sx={{ pt: 1 }}>
+              <Grid xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  required
+                  label="Job Title"
+                  name="title"
+                  value={job.title}
+                  onChange={handleChange}
+                />
+              </Grid>
+
+              <Grid xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  required
+                  label="Department"
+                  name="department"
+                  value={job.department}
+                  onChange={handleChange}
+                />
+              </Grid>
+
+              <Grid xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  required
+                  label="Location"
+                  name="location"
+                  value={job.location}
+                  onChange={handleChange}
+                  placeholder="e.g. Bangalore / Remote"
+                />
+              </Grid>
+
+              <Grid xs={12} sm={6}>
+                <FormControl fullWidth required>
+                  <InputLabel>
+                    Employment Type
+                  </InputLabel>
+
+                  <Select
+                    label="Employment Type"
+                    name="employmentType"
+                    value={job.employmentType}
+                    onChange={handleChange}
+                  >
+                    <MenuItem value="Full-time">
+                      Full-time
+                    </MenuItem>
+
+                    <MenuItem value="Part-time">
+                      Part-time
+                    </MenuItem>
+
+                    <MenuItem value="Internship">
+                      Internship
+                    </MenuItem>
+
+                    <MenuItem value="Contract">
+                      Contract
+                    </MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+
+              <Grid xs={12}>
+                <TextField
+                  fullWidth
+                  required
+                  multiline
+                  rows={4}
+                  label="Job Description"
+                  name="description"
+                  value={job.description}
+                  onChange={handleChange}
+                />
+              </Grid>
+
+              <Grid xs={12}>
+                <TextField
+                  fullWidth
+                  required
+                  label="Required Skills"
+                  name="skills"
+                  value={job.skills}
+                  onChange={handleChange}
+                  placeholder="e.g. React, Node.js, MongoDB"
+                  helperText="Separate skills with commas"
+                />
+              </Grid>
+            </Grid>
+          </DialogContent>
+
+          <DialogActions sx={{ p: 2 }}>
+            <Button onClick={handleCloseDialog}>
+              Cancel
+            </Button>
+
+            <Button
+              type="submit"
+              variant="contained"
+              startIcon={<AddIcon />}
+            >
+              {editingJobId
+                ? "Update Job"
+                : "Create Job"}
+            </Button>
+          </DialogActions>
+        </Box>
+      </Dialog>
+
+      {/* Success Message */}
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={3000}
+        onClose={() => setSnackbarOpen(false)}
+      >
+        <Alert
+          severity="success"
+          onClose={() => setSnackbarOpen(false)}
+        >
+          {snackbarMessage}
+        </Alert>
+      </Snackbar>
+    </Box>
+  );
+}
+
+export default Jobs;
