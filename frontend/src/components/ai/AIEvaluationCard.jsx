@@ -1,8 +1,11 @@
 import {
+  Alert,
   Box,
+  Button,
   Card,
   CardContent,
   Chip,
+  CircularProgress,
   Divider,
   LinearProgress,
   Stack,
@@ -10,6 +13,8 @@ import {
 } from "@mui/material";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import WarningAmberIcon from "@mui/icons-material/WarningAmber";
+import RefreshIcon from "@mui/icons-material/Refresh";
 import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 
 const getRecommendation = (score) => {
@@ -60,7 +65,8 @@ const getDefaultEvaluation = (candidate) => {
   );
 
   const missingSkills = targetSkills.filter(
-    (skill) => !normalizedSkills.includes(skill.toLowerCase())
+    (skill) =>
+      !normalizedSkills.includes(skill.toLowerCase())
   );
 
   const skillScore =
@@ -92,12 +98,206 @@ const getDefaultEvaluation = (candidate) => {
     missingSkills,
     recommendation: recommendation.label,
     recommendationColor: recommendation.color,
-    summary: `${candidate?.candidate || "The candidate"} shows relevant technical experience and demonstrates a reasonable match with the selected role. The candidate's skills and experience should be reviewed together before making the final hiring decision.`,
+    summary: `${
+      candidate?.candidate || "The candidate"
+    } shows relevant technical experience and demonstrates a reasonable match with the selected role. The candidate's skills and experience should be reviewed together before making the final hiring decision.`,
   };
 };
 
-const AIEvaluationCard = ({ candidate, evaluation }) => {
-  const result = evaluation || getDefaultEvaluation(candidate);
+const AIEvaluationCard = ({
+  candidate,
+  evaluation,
+  status = "success",
+  errorMessage = "Unable to generate AI evaluation right now.",
+  onRetry,
+}) => {
+  /*
+   * Loading State
+   */
+  if (status === "loading") {
+    return (
+      <Card
+        elevation={0}
+        sx={{
+          border: "1px solid",
+          borderColor: "divider",
+          borderRadius: 3,
+          background:
+            "linear-gradient(135deg, rgba(25,118,210,0.04), rgba(156,39,176,0.04))",
+        }}
+      >
+        <CardContent sx={{ p: 3 }}>
+          <Stack
+            spacing={2}
+            alignItems="center"
+            justifyContent="center"
+            sx={{ minHeight: 220 }}
+          >
+            <CircularProgress size={42} />
+
+            <Stack
+              direction="row"
+              spacing={1}
+              alignItems="center"
+            >
+              <AutoAwesomeIcon color="primary" />
+
+              <Typography
+                variant="h6"
+                fontWeight={700}
+              >
+                Analyzing Candidate
+              </Typography>
+            </Stack>
+
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              textAlign="center"
+            >
+              AI is evaluating the candidate's skills,
+              experience and role suitability.
+            </Typography>
+
+            <LinearProgress
+              sx={{
+                width: "100%",
+                maxWidth: 420,
+                height: 6,
+                borderRadius: 3,
+              }}
+            />
+          </Stack>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  /*
+   * Error State
+   */
+  if (status === "error") {
+    return (
+      <Card
+        elevation={0}
+        sx={{
+          border: "1px solid",
+          borderColor: "error.light",
+          borderRadius: 3,
+          backgroundColor: "error.50",
+        }}
+      >
+        <CardContent sx={{ p: 3 }}>
+          <Stack spacing={2}>
+            <Stack
+              direction="row"
+              spacing={1}
+              alignItems="center"
+            >
+             <WarningAmberIcon color="error" />
+
+              <Typography
+                variant="h6"
+                fontWeight={700}
+              >
+                AI Evaluation Failed
+              </Typography>
+            </Stack>
+
+            <Alert
+              severity="error"
+              variant="outlined"
+            >
+              {errorMessage}
+            </Alert>
+
+            <Typography
+              variant="body2"
+              color="text.secondary"
+            >
+              Please try again. If the problem continues,
+              the recruiter can review the candidate manually.
+            </Typography>
+
+            {onRetry && (
+              <Box>
+                <Button
+                  variant="contained"
+                  startIcon={<RefreshIcon />}
+                  onClick={onRetry}
+                >
+                  Retry Evaluation
+                </Button>
+              </Box>
+            )}
+          </Stack>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  /*
+   * No Result State
+   */
+  if (status === "empty" || !candidate && !evaluation) {
+    return (
+      <Card
+        elevation={0}
+        sx={{
+          border: "1px solid",
+          borderColor: "divider",
+          borderRadius: 3,
+        }}
+      >
+        <CardContent sx={{ p: 3 }}>
+          <Stack
+            spacing={2}
+            alignItems="center"
+            textAlign="center"
+            sx={{ minHeight: 180 }}
+            justifyContent="center"
+          >
+            <AutoAwesomeIcon
+              color="disabled"
+              sx={{ fontSize: 42 }}
+            />
+
+            <Typography
+              variant="h6"
+              fontWeight={700}
+            >
+              AI Evaluation Not Available
+            </Typography>
+
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              sx={{ maxWidth: 500 }}
+            >
+              There is no AI evaluation result available
+              for this candidate yet.
+            </Typography>
+
+            {onRetry && (
+              <Button
+                variant="outlined"
+                startIcon={<RefreshIcon />}
+                onClick={onRetry}
+              >
+                Generate Evaluation
+              </Button>
+            )}
+          </Stack>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  /*
+   * Success State
+   */
+  const result =
+    evaluation || getDefaultEvaluation(candidate);
 
   const score = result.overallScore ?? 0;
 
@@ -131,7 +331,10 @@ const AIEvaluationCard = ({ candidate, evaluation }) => {
                 alignItems="center"
                 sx={{ mb: 0.5 }}
               >
-                <AutoAwesomeIcon color="primary" fontSize="small" />
+                <AutoAwesomeIcon
+                  color="primary"
+                  fontSize="small"
+                />
 
                 <Typography
                   variant="h6"
