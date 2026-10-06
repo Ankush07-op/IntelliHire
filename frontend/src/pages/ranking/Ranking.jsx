@@ -164,6 +164,35 @@ function Ranking() {
     };
   }, [rankedCandidates]);
 
+  
+  const analyticsStats = useMemo(() => {
+    const strong = rankedCandidates.filter(
+      (candidate) => candidate.evaluation.overallScore >= 85
+    ).length;
+
+    const good = rankedCandidates.filter(
+      (candidate) =>
+        candidate.evaluation.overallScore >= 70 &&
+        candidate.evaluation.overallScore < 85
+    ).length;
+
+    const needsReview = rankedCandidates.filter(
+      (candidate) => candidate.evaluation.overallScore < 70
+    ).length;
+
+    const scores = rankedCandidates.map(
+      (candidate) => candidate.evaluation.overallScore
+    );
+
+    return {
+      strong,
+      good,
+      needsReview,
+      highest: scores.length > 0 ? Math.max(...scores) : 0,
+      lowest: scores.length > 0 ? Math.min(...scores) : 0,
+    };
+  }, [rankedCandidates]);
+
   return (
     <Box>
       {/* Page Header */}
@@ -588,6 +617,399 @@ function Ranking() {
               </Typography>
             </Box>
           </Box>
+        </CardContent>
+      </Card>
+
+      {/* Visual Analytics */}
+      <Card sx={{ mb: 3 }}>
+        <CardContent sx={{ p: 3 }}>
+          <Typography
+            variant="h6"
+            fontWeight={700}
+            sx={{ mb: 0.5 }}
+          >
+            Ranking Analytics
+          </Typography>
+
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            sx={{ mb: 3 }}
+          >
+            Visual summary of candidate quality and AI matching performance.
+          </Typography>
+
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: {
+                xs: "1fr",
+                md: "1fr 1fr",
+              },
+              gap: 3,
+            }}
+          >
+            {/* AI Score Distribution */}
+            <Box>
+              <Typography
+                variant="subtitle1"
+                fontWeight={700}
+                sx={{ mb: 2 }}
+              >
+                AI Score Distribution
+              </Typography>
+
+              <Stack spacing={2}>
+                <Box>
+                  <Stack
+                    direction="row"
+                    justifyContent="space-between"
+                    sx={{ mb: 0.5 }}
+                  >
+                    <Typography variant="body2">
+                      Strong Match
+                    </Typography>
+
+                    <Typography variant="body2" fontWeight={600}>
+                      {analyticsStats.strong} candidates
+                    </Typography>
+                  </Stack>
+
+                  <LinearProgress
+                    variant="determinate"
+                    value={
+                      rankingStats.totalCandidates > 0
+                        ? (analyticsStats.strong /
+                            rankingStats.totalCandidates) *
+                          100
+                        : 0
+                    }
+                    color="success"
+                    sx={{
+                      height: 9,
+                      borderRadius: 5,
+                    }}
+                  />
+
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                  >
+                    85–100% AI match
+                  </Typography>
+                </Box>
+
+                <Box>
+                 <Stack
+                  direction="row"
+                  justifyContent="space-between"
+                  alignItems="center"
+                  spacing={2}
+                  sx={{ mb: 0.5 }}
+                >
+                  <Typography variant="body2">
+                    Good Match
+                  </Typography>
+
+                  <Typography variant="body2" fontWeight={600}>
+                    {analyticsStats.good} candidates
+                  </Typography>
+                </Stack>
+
+                  <LinearProgress
+                    variant="determinate"
+                    value={
+                      rankingStats.totalCandidates > 0
+                        ? (analyticsStats.good /
+                            rankingStats.totalCandidates) *
+                          100
+                        : 0
+                    }
+                    color="warning"
+                    sx={{
+                      height: 9,
+                      borderRadius: 5,
+                    }}
+                  />
+
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                  >
+                    70–84% AI match
+                  </Typography>
+                </Box>
+
+                <Box>
+                 <Stack
+                    direction="row"
+                    justifyContent="space-between"
+                    alignItems="center"
+                    spacing={2}
+                    sx={{ mb: 0.5 }}
+                  >
+                    <Typography variant="body2">
+                      Needs Review
+                    </Typography>
+
+                    <Typography variant="body2" fontWeight={600}>
+                      {analyticsStats.needsReview} candidates
+                    </Typography>
+                  </Stack>
+                  <LinearProgress
+                    variant="determinate"
+                    value={
+                      rankingStats.totalCandidates > 0
+                        ? (analyticsStats.needsReview /
+                            rankingStats.totalCandidates) *
+                          100
+                        : 0
+                    }
+                    color="error"
+                    sx={{
+                      height: 9,
+                      borderRadius: 5,
+                    }}
+                  />
+
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                  >
+                    Below 70% AI match
+                  </Typography>
+                </Box>
+              </Stack>
+            </Box>
+
+            {/* Candidate Pool Statistics */}
+            <Box>
+              <Typography
+                variant="subtitle1"
+                fontWeight={700}
+                sx={{ mb: 2 }}
+              >
+                Candidate Pool Statistics
+              </Typography>
+
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: 2,
+                }}
+              >
+                <Box
+                  sx={{
+                    p: 2,
+                    borderRadius: 2,
+                    bgcolor: "background.default",
+                  }}
+                >
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                  >
+                    Total Candidates
+                  </Typography>
+
+                  <Typography
+                    variant="h5"
+                    fontWeight={700}
+                    sx={{ mt: 0.5 }}
+                  >
+                    {rankingStats.totalCandidates}
+                  </Typography>
+                </Box>
+
+                <Box
+                  sx={{
+                    p: 2,
+                    borderRadius: 2,
+                    bgcolor: "background.default",
+                  }}
+                >
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                  >
+                    Average Score
+                  </Typography>
+
+                  <Typography
+                    variant="h5"
+                    fontWeight={700}
+                    sx={{ mt: 0.5 }}
+                  >
+                    {rankingStats.averageScore}%
+                  </Typography>
+                </Box>
+
+                <Box
+                  sx={{
+                    p: 2,
+                    borderRadius: 2,
+                    bgcolor: "background.default",
+                  }}
+                >
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                  >
+                    Highest Score
+                  </Typography>
+
+                  <Typography
+                    variant="h5"
+                    fontWeight={700}
+                    color="success.main"
+                    sx={{ mt: 0.5 }}
+                  >
+                    {analyticsStats.highest}%
+                  </Typography>
+                </Box>
+
+                <Box
+                  sx={{
+                    p: 2,
+                    borderRadius: 2,
+                    bgcolor: "background.default",
+                  }}
+                >
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                  >
+                    Lowest Score
+                  </Typography>
+
+                  <Typography
+                    variant="h5"
+                    fontWeight={700}
+                    color="error.main"
+                    sx={{ mt: 0.5 }}
+                  >
+                    {analyticsStats.lowest}%
+                  </Typography>
+                </Box>
+              </Box>
+            </Box>
+          </Box>
+
+          <Divider sx={{ my: 3 }} />
+
+          {/* Candidate Score Comparison */}
+          <Typography
+            variant="subtitle1"
+            fontWeight={700}
+            sx={{ mb: 2 }}
+          >
+            Candidate Score Comparison
+          </Typography>
+
+          <Stack spacing={2}>
+            {rankedCandidates.map((candidate) => {
+              const {
+                overallScore,
+                skillsMatch,
+                experienceMatch,
+              } = candidate.evaluation;
+
+              return (
+                <Box key={candidate.id}>
+                  <Stack
+                    direction={{
+                      xs: "column",
+                      md: "row",
+                    }}
+                    spacing={2}
+                    alignItems={{
+                      xs: "stretch",
+                      md: "center",
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        width: {
+                          xs: "100%",
+                          md: 150,
+                        },
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Typography
+                        variant="body2"
+                        fontWeight={600}
+                      >
+                        {candidate.candidate}
+                      </Typography>
+                    </Box>
+
+                    <Box sx={{ flex: 1 }}>
+                      <Stack
+                        direction="row"
+                        justifyContent="space-between"
+                        sx={{ mb: 0.5 }}
+                      >
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                        >
+                          AI Match
+                        </Typography>
+
+                        <Typography
+                          variant="caption"
+                          fontWeight={700}
+                        >
+                          {overallScore}%
+                        </Typography>
+                      </Stack>
+
+                      <LinearProgress
+                        variant="determinate"
+                        value={overallScore}
+                        color={getScoreColor(overallScore)}
+                        sx={{
+                          height: 7,
+                          borderRadius: 4,
+                        }}
+                      />
+                    </Box>
+
+                    <Box
+                      sx={{
+                        width: {
+                          xs: "100%",
+                          md: 180,
+                        },
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Stack
+                        direction="row"
+                        spacing={1}
+                        justifyContent={{
+                          xs: "flex-start",
+                          md: "flex-end",
+                        }}
+                      >
+                        <Chip
+                          size="small"
+                          label={`Skills ${skillsMatch}%`}
+                        />
+
+                        <Chip
+                          size="small"
+                          label={`Exp. ${experienceMatch}%`}
+                        />
+                      </Stack>
+                    </Box>
+                  </Stack>
+                </Box>
+              );
+            })}
+          </Stack>
         </CardContent>
       </Card>
 
