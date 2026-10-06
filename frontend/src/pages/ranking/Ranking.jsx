@@ -17,27 +17,46 @@ import {
   TableRow,
   Typography,
 } from "@mui/material";
+import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
+import GroupsIcon from "@mui/icons-material/Groups";
+import StarIcon from "@mui/icons-material/Star";
+import TrendingUpIcon from "@mui/icons-material/TrendingUp";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import { getApplications } from "../../services/applicationStore";
 
 const getCandidateEvaluation = (application) => {
-  const skillCount = application.skills?.length || 0;
+  const skills = application?.skills || [];
+
+  const normalizedSkills = skills.map((skill) =>
+    skill.toLowerCase()
+  );
+
+  const targetSkills = [
+    "react",
+    "javascript",
+    "html",
+    "css",
+    "node.js",
+  ];
+
+  const matchedSkills = targetSkills.filter((skill) =>
+    normalizedSkills.includes(skill.toLowerCase())
+  );
 
   const skillsMatch =
-    skillCount >= 4 ? 90 : skillCount === 3 ? 82 : skillCount === 2 ? 74 : 65;
+    targetSkills.length > 0
+      ? Math.round(
+          (matchedSkills.length / targetSkills.length) * 100
+        )
+      : 0;
 
-  const experienceText = application.experience || "";
-  const experienceValue = parseFloat(experienceText) || 0;
+  const experienceText = application?.experience || "";
 
   const experienceMatch =
-    experienceValue >= 3
-      ? 92
-      : experienceValue >= 2.5
-        ? 88
-        : experienceValue >= 2
-          ? 84
-          : experienceValue >= 1.5
-            ? 78
-            : 70;
+    experienceText.toLowerCase().includes("2") ||
+    experienceText.toLowerCase().includes("3")
+      ? 90
+      : 75;
 
   const overallScore = Math.round(
     skillsMatch * 0.6 + experienceMatch * 0.4
@@ -107,13 +126,51 @@ function Ranking() {
     });
   }, [applications, sortBy]);
 
+  const rankingStats = useMemo(() => {
+    if (rankedCandidates.length === 0) {
+      return {
+        totalCandidates: 0,
+        averageScore: 0,
+        strongMatches: 0,
+        shortlisted: 0,
+        topCandidate: null,
+      };
+    }
+
+    const totalScore = rankedCandidates.reduce(
+      (total, candidate) =>
+        total + candidate.evaluation.overallScore,
+      0
+    );
+
+    const strongMatches = rankedCandidates.filter(
+      (candidate) =>
+        candidate.evaluation.overallScore >= 85
+    ).length;
+
+    const shortlisted = rankedCandidates.filter(
+      (candidate) =>
+        candidate.status === "Shortlisted"
+    ).length;
+
+    return {
+      totalCandidates: rankedCandidates.length,
+      averageScore: Math.round(
+        totalScore / rankedCandidates.length
+      ),
+      strongMatches,
+      shortlisted,
+      topCandidate: rankedCandidates[0],
+    };
+  }, [rankedCandidates]);
+
   return (
     <Box>
       {/* Page Header */}
       <Stack
-        direction={{ xs: "column", sm: "row" }}
+        direction={{ xs: "column", md: "row" }}
         justifyContent="space-between"
-        alignItems={{ xs: "flex-start", sm: "center" }}
+        alignItems={{ xs: "flex-start", md: "center" }}
         spacing={2}
         sx={{ mb: 3 }}
       >
@@ -126,15 +183,18 @@ function Ranking() {
             color="text.secondary"
             sx={{ mt: 0.5 }}
           >
-            Compare candidates using AI-based matching scores.
+            Compare candidates using AI-based matching
+            scores and recruiter insights.
           </Typography>
         </Box>
 
         <Select
           size="small"
           value={sortBy}
-          onChange={(event) => setSortBy(event.target.value)}
-          sx={{ minWidth: 190 }}
+          onChange={(event) =>
+            setSortBy(event.target.value)
+          }
+          sx={{ minWidth: 210 }}
         >
           <MenuItem value="score">
             Sort by Overall Score
@@ -150,64 +210,386 @@ function Ranking() {
         </Select>
       </Stack>
 
-      {/* Summary Cards */}
-      <Stack
-        direction={{ xs: "column", sm: "row" }}
-        spacing={2}
-        sx={{ mb: 3 }}
+      {/* Ranking Summary */}
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: {
+            xs: "1fr",
+            sm: "1fr 1fr",
+            lg: "repeat(4, 1fr)",
+          },
+          gap: 2,
+          mb: 3,
+        }}
       >
-        <Card sx={{ flex: 1 }}>
+        <Card>
           <CardContent>
-            <Typography
-              variant="body2"
-              color="text.secondary"
+            <Stack
+              direction="row"
+              justifyContent="space-between"
+              alignItems="flex-start"
             >
-              Candidates
-            </Typography>
+              <Box>
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                >
+                  Total Candidates
+                </Typography>
 
-            <Typography variant="h4" fontWeight={700}>
-              {rankedCandidates.length}
-            </Typography>
+                <Typography
+                  variant="h4"
+                  fontWeight={700}
+                  sx={{ mt: 0.5 }}
+                >
+                  {rankingStats.totalCandidates}
+                </Typography>
+              </Box>
+
+              <GroupsIcon
+                color="primary"
+                sx={{ fontSize: 32 }}
+              />
+            </Stack>
           </CardContent>
         </Card>
 
-        <Card sx={{ flex: 1 }}>
+        <Card>
           <CardContent>
-            <Typography
-              variant="body2"
-              color="text.secondary"
+            <Stack
+              direction="row"
+              justifyContent="space-between"
+              alignItems="flex-start"
             >
-              Top Match
-            </Typography>
+              <Box>
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                >
+                  Average AI Score
+                </Typography>
 
-            <Typography variant="h4" fontWeight={700}>
-              {rankedCandidates[0]
-                ? `${rankedCandidates[0].evaluation.overallScore}%`
-                : "--"}
-            </Typography>
+                <Typography
+                  variant="h4"
+                  fontWeight={700}
+                  sx={{ mt: 0.5 }}
+                >
+                  {rankingStats.averageScore}%
+                </Typography>
+              </Box>
+
+              <TrendingUpIcon
+                color="success"
+                sx={{ fontSize: 32 }}
+              />
+            </Stack>
           </CardContent>
         </Card>
 
-        <Card sx={{ flex: 1 }}>
+        <Card>
           <CardContent>
-            <Typography
-              variant="body2"
-              color="text.secondary"
+            <Stack
+              direction="row"
+              justifyContent="space-between"
+              alignItems="flex-start"
             >
-              Shortlisted
-            </Typography>
+              <Box>
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                >
+                  Strong Matches
+                </Typography>
 
-            <Typography variant="h4" fontWeight={700}>
-              {
-                rankedCandidates.filter(
-                  (candidate) =>
-                    candidate.status === "Shortlisted"
-                ).length
-              }
-            </Typography>
+                <Typography
+                  variant="h4"
+                  fontWeight={700}
+                  sx={{ mt: 0.5 }}
+                >
+                  {rankingStats.strongMatches}
+                </Typography>
+              </Box>
+
+              <StarIcon
+                color="warning"
+                sx={{ fontSize: 32 }}
+              />
+            </Stack>
           </CardContent>
         </Card>
-      </Stack>
+
+        <Card>
+          <CardContent>
+            <Stack
+              direction="row"
+              justifyContent="space-between"
+              alignItems="flex-start"
+            >
+              <Box>
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                >
+                  Shortlisted
+                </Typography>
+
+                <Typography
+                  variant="h4"
+                  fontWeight={700}
+                  sx={{ mt: 0.5 }}
+                >
+                  {rankingStats.shortlisted}
+                </Typography>
+              </Box>
+
+              <CheckCircleIcon
+                color="success"
+                sx={{ fontSize: 32 }}
+              />
+            </Stack>
+          </CardContent>
+        </Card>
+      </Box>
+
+      {/* Top Candidate */}
+      {rankingStats.topCandidate && (
+        <Card
+          sx={{
+            mb: 3,
+            border: "1px solid",
+            borderColor: "primary.light",
+            background:
+              "linear-gradient(135deg, rgba(25,118,210,0.05), rgba(156,39,176,0.04))",
+          }}
+        >
+          <CardContent sx={{ p: 3 }}>
+            <Stack
+              direction={{ xs: "column", md: "row" }}
+              justifyContent="space-between"
+              alignItems={{ xs: "flex-start", md: "center" }}
+              spacing={3}
+            >
+              <Stack
+                direction="row"
+                spacing={2}
+                alignItems="center"
+              >
+                <Box
+                  sx={{
+                    width: 56,
+                    height: 56,
+                    borderRadius: "50%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    bgcolor: "warning.light",
+                  }}
+                >
+                  <EmojiEventsIcon
+                    sx={{ fontSize: 32 }}
+                  />
+                </Box>
+
+                <Box>
+                  <Typography
+                    variant="overline"
+                    color="text.secondary"
+                  >
+                    Top Ranked Candidate
+                  </Typography>
+
+                  <Typography
+                    variant="h5"
+                    fontWeight={700}
+                  >
+                    {rankingStats.topCandidate.candidate}
+                  </Typography>
+
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                  >
+                    {rankingStats.topCandidate.job}
+                  </Typography>
+                </Box>
+              </Stack>
+
+              <Box
+                sx={{
+                  minWidth: { xs: "100%", md: 180 },
+                }}
+              >
+                <Stack
+                  direction="row"
+                  justifyContent="space-between"
+                  alignItems="center"
+                  sx={{ mb: 0.75 }}
+                >
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                  >
+                    AI Match
+                  </Typography>
+
+                  <Typography
+                    variant="h5"
+                    fontWeight={800}
+                    color="primary"
+                  >
+                    {
+                      rankingStats.topCandidate
+                        .evaluation.overallScore
+                    }%
+                  </Typography>
+                </Stack>
+
+                <LinearProgress
+                  variant="determinate"
+                  value={
+                    rankingStats.topCandidate.evaluation
+                      .overallScore
+                  }
+                  color="success"
+                  sx={{
+                    height: 8,
+                    borderRadius: 4,
+                  }}
+                />
+              </Box>
+            </Stack>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Recruiter Insights */}
+      <Card sx={{ mb: 3 }}>
+        <CardContent sx={{ p: 3 }}>
+          <Typography
+            variant="h6"
+            fontWeight={700}
+            sx={{ mb: 2 }}
+          >
+            Ranking Insights
+          </Typography>
+
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: {
+                xs: "1fr",
+                md: "repeat(3, 1fr)",
+              },
+              gap: 2,
+            }}
+          >
+            <Box
+              sx={{
+                p: 2,
+                borderRadius: 2,
+                bgcolor: "background.default",
+              }}
+            >
+              <Typography
+                variant="body2"
+                color="text.secondary"
+              >
+                Average candidate score
+              </Typography>
+
+              <Typography
+                variant="h6"
+                fontWeight={700}
+                sx={{ mt: 0.5 }}
+              >
+                {rankingStats.averageScore}%
+              </Typography>
+
+              <Typography
+                variant="caption"
+                color="text.secondary"
+              >
+                Based on the current candidate pool.
+              </Typography>
+            </Box>
+
+            <Box
+              sx={{
+                p: 2,
+                borderRadius: 2,
+                bgcolor: "background.default",
+              }}
+            >
+              <Typography
+                variant="body2"
+                color="text.secondary"
+              >
+                Strong match rate
+              </Typography>
+
+              <Typography
+                variant="h6"
+                fontWeight={700}
+                sx={{ mt: 0.5 }}
+              >
+                {rankingStats.totalCandidates > 0
+                  ? Math.round(
+                      (rankingStats.strongMatches /
+                        rankingStats.totalCandidates) *
+                        100
+                    )
+                  : 0}
+                %
+              </Typography>
+
+              <Typography
+                variant="caption"
+                color="text.secondary"
+              >
+                Candidates scoring 85% or higher.
+              </Typography>
+            </Box>
+
+            <Box
+              sx={{
+                p: 2,
+                borderRadius: 2,
+                bgcolor: "background.default",
+              }}
+            >
+              <Typography
+                variant="body2"
+                color="text.secondary"
+              >
+                Shortlist coverage
+              </Typography>
+
+              <Typography
+                variant="h6"
+                fontWeight={700}
+                sx={{ mt: 0.5 }}
+              >
+                {rankingStats.totalCandidates > 0
+                  ? Math.round(
+                      (rankingStats.shortlisted /
+                        rankingStats.totalCandidates) *
+                        100
+                    )
+                  : 0}
+                %
+              </Typography>
+
+              <Typography
+                variant="caption"
+                color="text.secondary"
+              >
+                Candidates currently shortlisted.
+              </Typography>
+            </Box>
+          </Box>
+        </CardContent>
+      </Card>
 
       {/* Ranking Table */}
       <Card>
@@ -222,7 +604,8 @@ function Ranking() {
               color="text.secondary"
               sx={{ mt: 0.5 }}
             >
-              Candidates are ordered by their calculated match score.
+              Candidates are ordered by their calculated
+              match score.
             </Typography>
           </Box>
 
@@ -300,9 +683,7 @@ function Ranking() {
                           hover
                         >
                           <TableCell>
-                            <Typography
-                              fontWeight={700}
-                            >
+                            <Typography fontWeight={700}>
                               #{index + 1}
                             </Typography>
                           </TableCell>
