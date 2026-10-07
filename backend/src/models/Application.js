@@ -13,7 +13,7 @@ const applicationSchema = new mongoose.Schema({
   },
   resumeUrl: { 
     type: String, 
-    required: true // Will be populated by S3 Multer upload
+    required: true // Cloudinary public ID populated by Multer upload
   },
   status: {
     type: String,

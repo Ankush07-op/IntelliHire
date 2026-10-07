@@ -206,7 +206,7 @@ const getResumeDownloadUrl = async (req, res) => {
       });
     }
 
-    // Generate 15-minute expiring pre-signed URL from AWS S3 key
+    // Generate 15-minute expiring signed URL from Cloudinary public ID
     const downloadUrl = await getPresignedDownloadUrl(application.resumeUrl);
 
     res.json({
