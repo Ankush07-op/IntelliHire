@@ -11,6 +11,7 @@ import {
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import WorkIcon from "@mui/icons-material/Work";
 import PeopleIcon from "@mui/icons-material/People";
+import ViewKanbanIcon from "@mui/icons-material/ViewKanban";
 import BarChartIcon from "@mui/icons-material/BarChart";
 import LogoutIcon from "@mui/icons-material/Logout";
 
@@ -38,6 +39,11 @@ function Sidebar() {
       text: "Applications",
       icon: <PeopleIcon />,
       path: "/applications",
+    },
+    {
+      text: "Kanban",
+      icon: <ViewKanbanIcon />,
+      path: "/kanban",
     },
     {
       text: "Ranking",
