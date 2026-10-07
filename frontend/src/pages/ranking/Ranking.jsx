@@ -197,6 +197,8 @@ function Ranking() {
   const [sortBy, setSortBy] = useState("score");
 
   const [scoreFilter, setScoreFilter] = useState("all");
+  const [skillFilter, setSkillFilter] = useState("all");
+  const [experienceFilter, setExperienceFilter] = useState("all");
 
 
 
@@ -209,16 +211,47 @@ function Ranking() {
     const filteredCandidates = candidates.filter((candidate) => {
       const score = candidate.evaluation.overallScore;
 
-      if (scoreFilter === "strong") {
-        return score >= 85;
+      if (scoreFilter === "strong" && score < 85) {
+        return false;
       }
 
-      if (scoreFilter === "good") {
-        return score >= 70 && score < 85;
+      if (
+        scoreFilter === "good" &&
+        (score < 70 || score >= 85)
+      ) {
+        return false;
       }
 
-      if (scoreFilter === "needsReview") {
-        return score < 70;
+      if (scoreFilter === "needsReview" && score >= 70) {
+        return false;
+      }
+
+      if (skillFilter !== "all") {
+        const candidateSkills = (candidate.skills || []).map((skill) =>
+          String(skill).toLowerCase()
+        );
+
+        if (!candidateSkills.includes(skillFilter.toLowerCase())) {
+          return false;
+        }
+      }
+
+      if (experienceFilter !== "all") {
+        const experienceText = String(candidate.experience || "").toLowerCase();
+        const experienceMatch = experienceText.match(/(\d+(?:\.\d+)?)\s*years?/);
+        const years = experienceMatch ? Number(experienceMatch[1]) : 0;
+
+        if (experienceFilter === "1plus" && years < 1) {
+          return false;
+        }
+
+        if (experienceFilter === "2plus" && years < 2) {
+          return false;
+        }
+
+        if (experienceFilter === "3plus" && years < 3) {
+          return false;
+        }
       }
 
       return true;
@@ -235,7 +268,13 @@ function Ranking() {
 
       return b.evaluation.overallScore - a.evaluation.overallScore;
     });
-  }, [applications, sortBy, scoreFilter]);
+  }, [
+    applications,
+    sortBy,
+    scoreFilter,
+    skillFilter,
+    experienceFilter,
+  ]);
 
   const rankingStats = useMemo(() => {
 
@@ -419,6 +458,32 @@ function Ranking() {
             <MenuItem value="strong">85–100 — Strong</MenuItem>
             <MenuItem value="good">70–84 — Good</MenuItem>
             <MenuItem value="needsReview">Below 70 — Needs Review</MenuItem>
+          </Select>
+
+          <Select
+            size="small"
+            value={skillFilter}
+            onChange={(event) => setSkillFilter(event.target.value)}
+            sx={{ minWidth: 180 }}
+          >
+            <MenuItem value="all">All Skills</MenuItem>
+            <MenuItem value="react">React</MenuItem>
+            <MenuItem value="javascript">JavaScript</MenuItem>
+            <MenuItem value="html">HTML</MenuItem>
+            <MenuItem value="css">CSS</MenuItem>
+            <MenuItem value="node.js">Node.js</MenuItem>
+          </Select>
+
+          <Select
+            size="small"
+            value={experienceFilter}
+            onChange={(event) => setExperienceFilter(event.target.value)}
+            sx={{ minWidth: 180 }}
+          >
+            <MenuItem value="all">All Experience</MenuItem>
+            <MenuItem value="1plus">1+ Years</MenuItem>
+            <MenuItem value="2plus">2+ Years</MenuItem>
+            <MenuItem value="3plus">3+ Years</MenuItem>
           </Select>
         </Stack>
       </Stack>
