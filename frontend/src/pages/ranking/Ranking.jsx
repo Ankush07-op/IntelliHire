@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import {
 
   Box,
+  Button,
 
   Card,
 
@@ -45,10 +46,46 @@ import StarIcon from "@mui/icons-material/Star";
 import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import DownloadIcon from "@mui/icons-material/Download";
 
 import { getApplications } from "../../services/applicationStore";
 
 
+
+const exportCandidatesToCsv = (candidates) => {
+  const headers = [
+    "Rank", "Candidate", "Email", "Applied Job",
+    "AI Match", "Skills Match", "Experience Match", "Status",
+  ];
+
+  const escapeCsvValue = (value) => {
+    const stringValue = String(value ?? "");
+    return `"${stringValue.replace(/"/g, '""')}"`;
+  };
+
+  const rows = candidates.map((candidate, index) => [
+    index + 1, candidate.candidate, candidate.email, candidate.job,
+    candidate.evaluation.overallScore,
+    candidate.evaluation.skillsMatch,
+    candidate.evaluation.experienceMatch,
+    candidate.status,
+  ]);
+
+  const csv = [
+    headers.map(escapeCsvValue).join(","),
+    ...rows.map((row) => row.map(escapeCsvValue).join(",")),
+  ].join("\n");
+
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "ranked-candidates.csv";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
 
 const getCandidateEvaluation = (application) => {
 
@@ -2042,35 +2079,40 @@ function Ranking() {
 
         <CardContent sx={{ p: 0 }}>
 
-          <Box sx={{ p: 2.5 }}>
+          <Box
+            sx={{
+              p: 2.5,
+              display: "flex",
+              flexDirection: { xs: "column", sm: "row" },
+              justifyContent: "space-between",
+              alignItems: { xs: "flex-start", sm: "center" },
+              gap: 2,
+            }}
+          >
+            <Box>
+              <Typography variant="h6" fontWeight={600}>
+                Ranked Candidates
+              </Typography>
 
-            <Typography variant="h6" fontWeight={600}>
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{ mt: 0.5 }}
+              >
+                Candidates are ordered by their calculated
+                match score.
+              </Typography>
+            </Box>
 
-              Ranked Candidates
-
-            </Typography>
-
-
-
-            <Typography
-
-              variant="body2"
-
-              color="text.secondary"
-
-              sx={{ mt: 0.5 }}
-
+            <Button
+              variant="outlined"
+              startIcon={<DownloadIcon />}
+              onClick={() => exportCandidatesToCsv(rankedCandidates)}
+              disabled={rankedCandidates.length === 0}
             >
-
-              Candidates are ordered by their calculated
-
-              match score.
-
-            </Typography>
-
+              Export CSV
+            </Button>
           </Box>
-
-
 
           <Divider />
 
