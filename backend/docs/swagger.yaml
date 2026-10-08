@@ -2,38 +2,417 @@ openapi: 3.0.0
 info:
   title: IntelliHire ATS API
   version: 1.0.0
-  description: AI-Powered Applicant Tracking System API Documentation
+  description: AI-Powered Applicant Tracking System API documentation for Recruiter and Applicant portals.
 servers:
   - url: http://localhost:5000
     description: Local Development Server
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    UserRegisterInput:
+      type: object
+      required:
+        - name
+        - email
+        - password
+        - role
+      properties:
+        name:
+          type: string
+          example: Jane Doe
+        email:
+          type: string
+          format: email
+          example: jane@example.com
+        password:
+          type: string
+          example: SecretPassword123
+        role:
+          type: string
+          enum: [recruiter, applicant]
+          example: recruiter
+        companyName:
+          type: string
+          example: Acme Corp
+
+    UserLoginInput:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          example: jane@example.com
+        password:
+          type: string
+          example: SecretPassword123
+
+    AuthResponse:
+      type: object
+      properties:
+        _id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+        token:
+          type: string
+
+    JobInput:
+      type: object
+      required:
+        - title
+        - description
+      properties:
+        title:
+          type: string
+          example: Senior Fullstack Engineer
+        description:
+          type: string
+          example: Looking for an experienced Node.js and React developer.
+        requiredSkills:
+          type: array
+          items:
+            type: string
+          example: ["Node.js", "React", "MongoDB", "TypeScript"]
+        experienceLevel:
+          type: string
+          example: Senior
+
+    StatusUpdateInput:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum: [Applied, Shortlisted, Interview, Offered, Rejected]
+          example: Interview
+        interviewDetails:
+          type: string
+          example: "Technical Round: October 12th at 2:00 PM via Google Meet: https://meet.google.com/xyz"
+
+    ErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+
 paths:
+  /api/health:
+    get:
+      summary: Health check endpoint
+      responses:
+        200:
+          description: API is healthy
+
   /api/auth/register:
     post:
-      summary: Register a new user
+      summary: Register a new recruiter or applicant
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                name: { type: string }
-                email: { type: string }
-                password: { type: string }
-                role: { type: string, enum: [recruiter, applicant] }
+              $ref: '#/components/schemas/UserRegisterInput'
       responses:
         201:
-          description: User created successfully
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        400:
+          description: Validation error or user already exists
+
+  /api/auth/login:
+    post:
+      summary: Authenticate user credentials and return JWT token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserLoginInput'
+      responses:
+        200:
+          description: Successful authentication
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        401:
+          description: Invalid email or password
+
   /api/jobs:
     get:
-      summary: Fetch active job postings with search/pagination
+      summary: Fetch job postings with search, filter, and pagination
       parameters:
         - in: query
           name: search
-          schema: { type: string }
+          schema:
+            type: string
+          description: Search keywords across job title or required skills
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [active, archived, draft]
+            default: active
         - in: query
           name: page
-          schema: { type: integer }
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
       responses:
         200:
-          description: List of jobs returned
+          description: Paginated list of jobs
+    post:
+      summary: Create a new job posting
+      security:
+        - bearerAuth: []
+      description: Restricted to recruiters
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JobInput'
+      responses:
+        201:
+          description: Job created successfully
+        400:
+          description: Title or description missing
+        403:
+          description: Forbidden (Not a recruiter)
+
+  /api/jobs/{id}:
+    get:
+      summary: Get details of a single job posting by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Job details
+        404:
+          description: Job not found
+    put:
+      summary: Update an existing job posting
+      security:
+        - bearerAuth: []
+      description: Restricted to the recruiter who created the job
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JobInput'
+      responses:
+        200:
+          description: Job updated successfully
+        403:
+          description: Unauthorized to modify this job
+
+  /api/jobs/{id}/archive:
+    patch:
+      summary: Soft-delete / archive a job posting
+      security:
+        - bearerAuth: []
+      description: Restricted to the job owner recruiter
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Job archived successfully
+
+  /api/applications:
+    post:
+      summary: Submit a candidate application with resume upload
+      security:
+        - bearerAuth: []
+      description: Restricted to applicants. Uploads resume buffer to Cloudinary and kicks off async AI parsing.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - jobId
+                - resume
+              properties:
+                jobId:
+                  type: string
+                  description: MongoDB ObjectId of target job
+                resume:
+                  type: string
+                  format: binary
+                  description: Resume document in PDF or DOCX format (Max 5MB)
+      responses:
+        201:
+          description: Application submitted and queued for AI analysis
+        400:
+          description: Missing jobId, file too large, or duplicate application
+
+  /api/applications/me:
+    get:
+      summary: Retrieve all applications submitted by the logged-in applicant
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Array of submitted applications
+
+  /api/applications/job/{jobId}:
+    get:
+      summary: Retrieve all applications for a specific job
+      security:
+        - bearerAuth: []
+      description: Restricted to the recruiter who created the job
+      parameters:
+        - in: path
+          name: jobId
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: List of applications with candidate profiles
+
+  /api/applications/{id}/status:
+    patch:
+      summary: Update candidate pipeline stage and dispatch email notification
+      security:
+        - bearerAuth: []
+      description: Restricted to the job owner recruiter. Triggers status update email or interview invitation.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StatusUpdateInput'
+      responses:
+        200:
+          description: Pipeline stage updated and email triggered
+
+  /api/applications/{id}/resume:
+    get:
+      summary: Generate an expiring signed URL to download/view candidate resume
+      security:
+        - bearerAuth: []
+      description: Accessible only by the candidate who submitted it or the recruiter hiring for the job.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Expiring signed Cloudinary URL (valid 15 minutes)
+
+  /api/applications/{id}/analysis:
+    get:
+      summary: Fetch detailed AI match analysis for a candidate application
+      security:
+        - bearerAuth: []
+      description: Restricted to recruiters
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: AI analysis metrics (score, matched skills, gaps, summary)
+        404:
+          description: Analysis is still processing or failed
+
+  /api/applications/{id}/reanalyze:
+    post:
+      summary: Manually re-trigger AI analysis worker for an application
+      security:
+        - bearerAuth: []
+      description: Restricted to the hiring recruiter
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: AI analysis re-queued successfully
+
+  /api/rankings/job/{jobId}:
+    get:
+      summary: Retrieve candidates ranked by AI score and experience with filters
+      security:
+        - bearerAuth: []
+      description: Restricted to the hiring recruiter. Returns candidates sorted by match score and experience.
+      parameters:
+        - in: path
+          name: jobId
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: minScore
+          schema:
+            type: number
+            default: 0
+        - in: query
+          name: maxScore
+          schema:
+            type: number
+            default: 100
+        - in: query
+          name: minExperience
+          schema:
+            type: number
+            default: 0
+        - in: query
+          name: skill
+          schema:
+            type: string
+            description: Filter for candidates who possess this specific matched skill
+      responses:
+        200:
+          description: Ranked list of candidates
