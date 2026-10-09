@@ -5,6 +5,8 @@ import StatusBadge from "../features/applicant/applications/StatusBadge.jsx";
 import StatusTimeline from "../features/applicant/applications/StatusTimeline.jsx";
 import Loader from "../components/Loader";
 
+import { formatDate } from "../utils/formatDate";
+
 export default function ApplicationDetailPage() {
   const { id } = useParams();
   const [application, setApplication] = useState(null);
@@ -50,7 +52,7 @@ export default function ApplicationDetailPage() {
         </div>
 
         <p className="text-xs text-slate-400 mt-3">
-          Applied on {new Date(application.appliedAt).toLocaleDateString()}
+          Applied on {formatDate(application.appliedAt)}
         </p>
 
         <div className="mt-6 pt-6 border-t border-slate-100">

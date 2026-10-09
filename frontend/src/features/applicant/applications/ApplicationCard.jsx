@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import StatusBadge from "./StatusBadge";
+import { formatDate } from "../../../utils/formatDate";
 
 export default function ApplicationCard({ application }) {
     return (
@@ -16,7 +17,7 @@ export default function ApplicationCard({ application }) {
             </div>
 
             <p className="text-xs text-slate-400 mt-3">
-                Applied on {new Date(application.appliedAt).toLocaleDateString()}
+                Applied on {formatDate(application.appliedAt)}
             </p>
         </Link>
     );

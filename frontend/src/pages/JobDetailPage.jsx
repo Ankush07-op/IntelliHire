@@ -3,6 +3,8 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import { getJobById } from "../features/applicant/jobs/jobsApi";
 import { useAuth } from "../features/applicant/auth/AuthContext";
 import Loader from "../components/Loader";
+import { formatDate } from "../utils/formatDate";
+
 
 export default function JobDetailPage() {
   const { id } = useParams();
@@ -80,7 +82,7 @@ export default function JobDetailPage() {
         <p className="text-sm text-slate-600 leading-relaxed">{job.description}</p>
 
         <p className="text-xs text-slate-400 mt-6">
-          Posted on {new Date(job.postedAt).toLocaleDateString()}
+          Posted on {formatDate(job.postedAt)}
         </p>
 
         <button
