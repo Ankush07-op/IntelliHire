@@ -3,6 +3,7 @@ import {
   Button,
   Card,
   CardContent,
+  CircularProgress,
   TextField,
   Typography,
   Link,
@@ -11,21 +12,26 @@ import {
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import api from "../../services/api";
+import { useAuth } from "../../context/useAuth";
+
 function RecruiterRegister() {
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   const [name, setName] = useState("");
+  const [companyName, setCompanyName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
-
     setError("");
 
-    if (!name || !email || !password || !confirmPassword) {
+    if (!name || !email || !password || !confirmPassword || !companyName) {
       setError("Please fill in all fields.");
       return;
     }
@@ -40,20 +46,33 @@ function RecruiterRegister() {
       return;
     }
 
-    const recruiterAccount = {
-      name: name.trim(),
-      email: email.trim().toLowerCase(),
-      password: password,
-    };
+    setLoading(true);
 
-    localStorage.setItem(
-      "recruiterAccount",
-      JSON.stringify(recruiterAccount)
-    );
+    try {
+      const { data } = await api.post("/auth/register", {
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        password,
+        role: "recruiter",
+        companyName: companyName.trim(),
+      });
 
-    alert("Registration successful!");
+      // Auto-login after successful registration
+      login(data.token, {
+        _id: data._id,
+        name: data.name,
+        email: data.email,
+        role: data.role,
+        companyName: data.companyName,
+      });
 
-    navigate("/login", { replace: true });
+      navigate("/dashboard", { replace: true });
+    } catch (err) {
+      const message = err.response?.data?.message || "Registration failed. Please try again.";
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -107,6 +126,17 @@ function RecruiterRegister() {
               onChange={(e) => setName(e.target.value)}
               margin="normal"
               required
+              disabled={loading}
+            />
+
+            <TextField
+              fullWidth
+              label="Company Name"
+              value={companyName}
+              onChange={(e) => setCompanyName(e.target.value)}
+              margin="normal"
+              required
+              disabled={loading}
             />
 
             <TextField
@@ -117,6 +147,7 @@ function RecruiterRegister() {
               onChange={(e) => setEmail(e.target.value)}
               margin="normal"
               required
+              disabled={loading}
             />
 
             <TextField
@@ -127,6 +158,7 @@ function RecruiterRegister() {
               onChange={(e) => setPassword(e.target.value)}
               margin="normal"
               required
+              disabled={loading}
             />
 
             <TextField
@@ -137,6 +169,7 @@ function RecruiterRegister() {
               onChange={(e) => setConfirmPassword(e.target.value)}
               margin="normal"
               required
+              disabled={loading}
             />
 
             <Button
@@ -145,8 +178,10 @@ function RecruiterRegister() {
               variant="contained"
               size="large"
               sx={{ mt: 3 }}
+              disabled={loading}
+              startIcon={loading ? <CircularProgress size={18} color="inherit" /> : null}
             >
-              Register
+              {loading ? "Creating Account..." : "Register"}
             </Button>
 
             <Typography variant="body2" textAlign="center" sx={{ mt: 3 }}>

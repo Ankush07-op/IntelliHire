@@ -1,50 +1,43 @@
-import {
-  createContext,
-  useContext,
-  useState,
-} from "react";
+import { useState } from "react";
+import { AuthContext } from "./authContext";
 
-const AuthContext = createContext(null);
+// Safely parse localStorage user JSON
+const getStoredUser = () => {
+  try {
+    const raw = localStorage.getItem("user");
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    localStorage.removeItem("user");
+    return null;
+  }
+};
 
 export function AuthProvider({ children }) {
-  const [isLoggedIn, setIsLoggedIn] = useState(
-    localStorage.getItem("isRecruiterLoggedIn") === "true"
-  );
+  const [token, setToken] = useState(() => localStorage.getItem("token") || null);
+  const [user, setUser] = useState(getStoredUser);
 
-  const [recruiter, setRecruiter] = useState(() => {
-    const savedAccount = localStorage.getItem("recruiterAccount");
+  const isLoggedIn = Boolean(token);
 
-    if (!savedAccount) {
-      return null;
-    }
-
-    try {
-      return JSON.parse(savedAccount);
-    } catch {
-      localStorage.removeItem("recruiterAccount");
-      return null;
-    }
-  });
-
-  const login = (account) => {
-    localStorage.setItem("isRecruiterLoggedIn", "true");
-
-    setIsLoggedIn(true);
-    setRecruiter(account);
+  const login = (receivedToken, receivedUser) => {
+    localStorage.setItem("token", receivedToken);
+    localStorage.setItem("user", JSON.stringify(receivedUser));
+    setToken(receivedToken);
+    setUser(receivedUser);
   };
 
   const logout = () => {
-    localStorage.removeItem("isRecruiterLoggedIn");
-
-    setIsLoggedIn(false);
-    setRecruiter(null);
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    setToken(null);
+    setUser(null);
   };
 
   return (
     <AuthContext.Provider
       value={{
         isLoggedIn,
-        recruiter,
+        token,
+        user,
         login,
         logout,
       }}
@@ -52,8 +45,4 @@ export function AuthProvider({ children }) {
       {children}
     </AuthContext.Provider>
   );
-}
-
-export function useAuth() {
-  return useContext(AuthContext);
 }

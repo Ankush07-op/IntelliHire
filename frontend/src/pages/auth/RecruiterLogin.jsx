@@ -3,6 +3,7 @@ import {
   Button,
   Card,
   CardContent,
+  CircularProgress,
   TextField,
   Typography,
   Link,
@@ -11,7 +12,8 @@ import {
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { useAuth } from "../../context/AuthContext";
+import api from "../../services/api";
+import { useAuth } from "../../context/useAuth";
 
 function RecruiterLogin() {
   const navigate = useNavigate();
@@ -20,36 +22,37 @@ function RecruiterLogin() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
-
     setError("");
+    setLoading(true);
 
-    const savedAccount = localStorage.getItem("recruiterAccount");
+    try {
+      const { data } = await api.post("/auth/login", { email, password });
 
-    if (!savedAccount) {
-      setError("No recruiter account found. Please register first.");
-      return;
+      // Backend returns: { _id, name, email, role, token }
+      if (data.role !== "recruiter") {
+        setError("This portal is for recruiters only. Please use the applicant portal.");
+        return;
+      }
+
+      login(data.token, {
+        _id: data._id,
+        name: data.name,
+        email: data.email,
+        role: data.role,
+        companyName: data.companyName,
+      });
+
+      navigate("/dashboard", { replace: true });
+    } catch (err) {
+      const message = err.response?.data?.message || "Login failed. Please try again.";
+      setError(message);
+    } finally {
+      setLoading(false);
     }
-
-    const recruiter = JSON.parse(savedAccount);
-
-    const enteredEmail = email.trim().toLowerCase();
-
-    if (
-      enteredEmail !== recruiter.email ||
-      password !== recruiter.password
-    ) {
-      setError("Invalid email or password.");
-      return;
-    }
-
-    login(recruiter);
-
-    alert("Login successful!");
-
-    navigate("/dashboard", { replace: true });
   };
 
   return (
@@ -104,6 +107,7 @@ function RecruiterLogin() {
               onChange={(event) => setEmail(event.target.value)}
               margin="normal"
               required
+              disabled={loading}
             />
 
             <TextField
@@ -114,6 +118,7 @@ function RecruiterLogin() {
               onChange={(event) => setPassword(event.target.value)}
               margin="normal"
               required
+              disabled={loading}
             />
 
             <Button
@@ -122,8 +127,10 @@ function RecruiterLogin() {
               variant="contained"
               size="large"
               sx={{ mt: 3 }}
+              disabled={loading}
+              startIcon={loading ? <CircularProgress size={18} color="inherit" /> : null}
             >
-              Login
+              {loading ? "Signing In..." : "Login"}
             </Button>
 
             <Typography variant="body2" textAlign="center" sx={{ mt: 3 }}>

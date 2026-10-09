@@ -6,7 +6,7 @@ import {
   Avatar,
 } from "@mui/material";
 
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../context/useAuth";
 
 function Navbar() {
   const { recruiter } = useAuth();
