@@ -8,24 +8,23 @@ const drawerWidth = 240;
 
 function MainLayout() {
   return (
-    <Box sx={{ display: "flex" }}>
+    <Box sx={{ display: "flex", minHeight: "100vh" }}>
       <Navbar />
-
       <Sidebar />
 
       <Box
         component="main"
         sx={{
           flexGrow: 1,
-          p: 3,
-          width: `calc(100% - ${drawerWidth}px)`,
+          minWidth: 0,
+          width: { xs: "100%", md: `calc(100% - ${drawerWidth}px)` },
+          p: { xs: 2, sm: 3 },
+          pt: { xs: 10, sm: 11 },
           minHeight: "100vh",
           backgroundColor: "background.default",
         }}
       >
-        <Box sx={{ mt: 8 }}>
-          <Outlet />
-        </Box>
+        <Outlet />
       </Box>
     </Box>
   );
