@@ -19,6 +19,7 @@ import ViewKanbanIcon from "@mui/icons-material/ViewKanban";
 import BarChartIcon from "@mui/icons-material/BarChart";
 import LogoutIcon from "@mui/icons-material/Logout";
 import MenuIcon from "@mui/icons-material/Menu";
+import EventIcon from "@mui/icons-material/Event";
 
 import { useAuth } from "../../context/AuthContext";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -56,6 +57,11 @@ function Sidebar() {
       text: "Ranking",
       icon: <BarChartIcon />,
       path: "/ranking",
+    },
+    {
+      text: "Interviews",
+      icon: <EventIcon />,
+      path: "/interviews",
     },
   ];
 

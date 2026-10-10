@@ -13,6 +13,7 @@ import RecruiterLogin from "./pages/auth/RecruiterLogin";
 import RecruiterRegister from "./pages/auth/RecruiterRegister";
 
 import ProtectedRoute from "./routes/ProtectedRoute";
+import Interviews from "./pages/interviews/Interviews";
 
 function App() {
   return (
@@ -31,6 +32,7 @@ function App() {
           <Route path="applications" element={<Applications />} />
           <Route path="kanban" element={<Kanban />} />
           <Route path="ranking" element={<Ranking />} />
+          <Route path="interviews" element={<Interviews />} />
         </Route>
       </Route>
     </Routes>
