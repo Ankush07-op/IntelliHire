@@ -7,29 +7,51 @@ import {
   DialogContent,
   DialogTitle,
   FormControl,
-  FormControlLabel,
   InputLabel,
   MenuItem,
-  Radio,
-  RadioGroup,
   Select,
   Snackbar,
   TextField,
 } from "@mui/material";
 import EventIcon from "@mui/icons-material/Event";
 
+const STORAGE_KEY = "interviewInvitations";
+
+const getToday = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+};
+
+const getSavedInvitations = () => {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    const parsed = saved ? JSON.parse(saved) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
+const initialForm = {
+  date: "",
+  time: "",
+  type: "Online",
+  message:
+    "Please join the interview 5 minutes before the scheduled time.",
+};
+
 const InterviewInvite = ({ candidate }) => {
   const [open, setOpen] = useState(false);
+  const [formData, setFormData] = useState({ ...initialForm });
+  const [error, setError] = useState("");
+  const [notification, setNotification] = useState("");
+  const [notificationOpen, setNotificationOpen] = useState(false);
 
-  const [formData, setFormData] = useState({
-    date: "",
-    time: "",
-    type: "Online",
-    message:
-      "Please join the interview 5 minutes before the scheduled time.",
-  });
-
-  const [success, setSuccess] = useState(false);
+  const candidateName = candidate?.candidate || "Candidate";
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -38,28 +60,71 @@ const InterviewInvite = ({ candidate }) => {
       ...previous,
       [name]: value,
     }));
+
+    setError("");
   };
 
   const handleOpen = () => {
+    setError("");
     setOpen(true);
   };
 
   const handleClose = () => {
     setOpen(false);
+    setError("");
   };
 
   const handleSubmit = () => {
     if (!formData.date || !formData.time) {
+      setError("Please select an interview date and time.");
       return;
     }
 
-    console.log("Interview invitation:", {
-      candidate,
-      ...formData,
-    });
+    const interviewDateTime = new Date(
+      `${formData.date}T${formData.time}`
+    );
+
+    if (Number.isNaN(interviewDateTime.getTime())) {
+      setError("Please enter a valid interview date and time.");
+      return;
+    }
+
+    if (interviewDateTime <= new Date()) {
+      setError("Please choose a future interview date and time.");
+      return;
+    }
+
+    const invitation = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      candidateName,
+      candidateEmail: candidate?.email || "",
+      date: formData.date,
+      time: formData.time,
+      type: formData.type,
+      message: formData.message.trim(),
+      createdAt: new Date().toISOString(),
+      status: "Scheduled",
+    };
+
+    try {
+      const invitations = getSavedInvitations();
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify([...invitations, invitation])
+      );
+    } catch {
+      setError(
+        "Unable to save the invitation on this device. Please check available storage."
+      );
+      return;
+    }
 
     setOpen(false);
-    setSuccess(true);
+    setFormData({ ...initialForm });
+    setNotification(
+      "Interview invitation saved on this device. No email was sent."
+    );
+    setNotificationOpen(true);
   };
 
   return (
@@ -79,18 +144,22 @@ const InterviewInvite = ({ candidate }) => {
         fullWidth
         maxWidth="sm"
       >
-        <DialogTitle>
-          Invite Candidate for Interview
-        </DialogTitle>
+        <DialogTitle>Schedule Candidate Interview</DialogTitle>
 
         <DialogContent>
+          {error && (
+            <Alert severity="error" sx={{ mt: 1 }}>
+              {error}
+            </Alert>
+          )}
+
           <TextField
             fullWidth
             label="Candidate"
-            value={candidate?.candidate || "Candidate"}
+            value={candidateName}
             margin="normal"
-            InputProps={{
-              readOnly: true,
+            slotProps={{
+              input: { readOnly: true },
             }}
           />
 
@@ -103,8 +172,9 @@ const InterviewInvite = ({ candidate }) => {
             value={formData.date}
             onChange={handleChange}
             margin="normal"
-            InputLabelProps={{
-              shrink: true,
+            slotProps={{
+              inputLabel: { shrink: true },
+              htmlInput: { min: getToday() },
             }}
           />
 
@@ -117,8 +187,8 @@ const InterviewInvite = ({ candidate }) => {
             value={formData.time}
             onChange={handleChange}
             margin="normal"
-            InputLabelProps={{
-              shrink: true,
+            slotProps={{
+              inputLabel: { shrink: true },
             }}
           />
 
@@ -140,31 +210,6 @@ const InterviewInvite = ({ candidate }) => {
             </Select>
           </FormControl>
 
-          <RadioGroup
-            row
-            value={formData.type}
-            onChange={handleChange}
-            name="type"
-          >
-            <FormControlLabel
-              value="Online"
-              control={<Radio />}
-              label="Online"
-            />
-
-            <FormControlLabel
-              value="In-person"
-              control={<Radio />}
-              label="In-person"
-            />
-
-            <FormControlLabel
-              value="Phone"
-              control={<Radio />}
-              label="Phone"
-            />
-          </RadioGroup>
-
           <TextField
             fullWidth
             multiline
@@ -178,30 +223,28 @@ const InterviewInvite = ({ candidate }) => {
         </DialogContent>
 
         <DialogActions>
-          <Button onClick={handleClose}>
-            Cancel
-          </Button>
+          <Button onClick={handleClose}>Cancel</Button>
 
           <Button
             variant="contained"
             onClick={handleSubmit}
             disabled={!formData.date || !formData.time}
           >
-            Send Invitation
+            Save Interview
           </Button>
         </DialogActions>
       </Dialog>
 
       <Snackbar
-        open={success}
-        autoHideDuration={4000}
-        onClose={() => setSuccess(false)}
+        open={notificationOpen}
+        autoHideDuration={5000}
+        onClose={() => setNotificationOpen(false)}
       >
         <Alert
           severity="success"
-          onClose={() => setSuccess(false)}
+          onClose={() => setNotificationOpen(false)}
         >
-          Interview invitation sent successfully
+          {notification}
         </Alert>
       </Snackbar>
     </>
