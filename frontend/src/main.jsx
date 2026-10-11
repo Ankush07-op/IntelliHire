@@ -6,7 +6,7 @@ import { ThemeProvider } from "@mui/material/styles";
 
 import App from "./App";
 import theme from "./theme/theme";
-import { AuthProvider } from "./context/AuthContext";
+import { AuthProvider } from "./context/AuthContext.jsx";
 import "./index.css";
 
 const queryClient = new QueryClient();

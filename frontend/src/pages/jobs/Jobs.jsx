@@ -5,6 +5,7 @@ import {
   Card,
   CardContent,
   Chip,
+  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
@@ -14,6 +15,7 @@ import {
   InputLabel,
   MenuItem,
   Select,
+  Skeleton,
   Snackbar,
   TextField,
   Typography,
@@ -23,39 +25,93 @@ import AddIcon from "@mui/icons-material/Add";
 import WorkIcon from "@mui/icons-material/Work";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import ArchiveIcon from "@mui/icons-material/Archive";
-import LocationOnIcon from "@mui/icons-material/LocationOn";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
+
+import {
+  fetchJobs,
+  createJob,
+  updateJob,
+  archiveJob,
+} from "../../services/jobService";
+
+// Empty form state
+const EMPTY_FORM = {
+  title: "",
+  department: "",
+  location: "",
+  employmentType: "",
+  description: "",
+  skills: "",
+  experienceLevel: "",
+};
 
 function Jobs() {
   const [openDialog, setOpenDialog] = useState(false);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
+  const [snackbarSeverity, setSnackbarSeverity] = useState("success");
 
+  // Jobs from backend
   const [jobs, setJobs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState("");
+
+  // Dialog state
   const [editingJobId, setEditingJobId] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [job, setJob] = useState(EMPTY_FORM);
 
-  const [job, setJob] = useState({
-    title: "",
-    department: "",
-    location: "",
-    employmentType: "",
-    description: "",
-    skills: "",
-  });
+  // ──────────────────────────────────────────────────────────
+  // Fetch all recruiter's jobs (all statuses via query)
+  // ──────────────────────────────────────────────────────────
+  const loadJobs = useCallback(async () => {
+    setLoading(true);
+    setFetchError("");
+    try {
+      // Fetch active + archived by not passing a status filter
+      const [activeData, archivedData] = await Promise.all([
+        fetchJobs({ status: "active" }),
+        fetchJobs({ status: "archived" }),
+      ]);
+      setJobs([...activeData.jobs, ...archivedData.jobs]);
+    } catch (err) {
+      setFetchError(err.response?.data?.message || "Failed to load jobs.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
+  useEffect(() => {
+    loadJobs();
+  }, [loadJobs]);
+
+  // ──────────────────────────────────────────────────────────
+  // Helpers
+  // ──────────────────────────────────────────────────────────
+  const showSnackbar = (message, severity = "success") => {
+    setSnackbarMessage(message);
+    setSnackbarSeverity(severity);
+    setSnackbarOpen(true);
+  };
+
+  // Converts comma-separated skill string into a clean string array for the backend
+  const parseSkills = (skillString) =>
+    skillString
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+  // Converts backend requiredSkills array back into display string for the form
+  const skillsToString = (skillsArray) =>
+    Array.isArray(skillsArray) ? skillsArray.join(", ") : skillsArray || "";
+
+  // ──────────────────────────────────────────────────────────
+  // Dialog handlers
+  // ──────────────────────────────────────────────────────────
   const handleOpenDialog = () => {
     setEditingJobId(null);
-
-    setJob({
-      title: "",
-      department: "",
-      location: "",
-      employmentType: "",
-      description: "",
-      skills: "",
-    });
-
+    setJob(EMPTY_FORM);
     setOpenDialog(true);
   };
 
@@ -66,105 +122,88 @@ function Jobs() {
 
   const handleChange = (event) => {
     const { name, value } = event.target;
-
-    setJob((previousJob) => ({
-      ...previousJob,
-      [name]: value,
-    }));
-  };
-
-  const handleCreateJob = (event) => {
-    event.preventDefault();
-
-    const newJob = {
-      id: Date.now(),
-      ...job,
-      status: "Active",
-    };
-
-    setJobs((previousJobs) => [...previousJobs, newJob]);
-
-    setOpenDialog(false);
-    setSnackbarMessage("Job created successfully.");
-    setSnackbarOpen(true);
-
-    setJob({
-      title: "",
-      department: "",
-      location: "",
-      employmentType: "",
-      description: "",
-      skills: "",
-    });
+    setJob((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleEditJob = (jobToEdit) => {
     setJob({
       title: jobToEdit.title,
-      department: jobToEdit.department,
-      location: jobToEdit.location,
-      employmentType: jobToEdit.employmentType,
+      department: jobToEdit.department || "",
+      location: jobToEdit.location || "",
+      employmentType: jobToEdit.employmentType || "",
       description: jobToEdit.description,
-      skills: jobToEdit.skills,
+      skills: skillsToString(jobToEdit.requiredSkills),
+      experienceLevel: jobToEdit.experienceLevel || "",
     });
-
-    setEditingJobId(jobToEdit.id);
+    setEditingJobId(jobToEdit._id);
     setOpenDialog(true);
   };
 
-  const handleUpdateJob = (event) => {
+  // ──────────────────────────────────────────────────────────
+  // Create / Update submit
+  // ──────────────────────────────────────────────────────────
+  const buildPayload = () => ({
+    title: job.title,
+    description: job.description,
+    requiredSkills: parseSkills(job.skills),
+    experienceLevel: job.experienceLevel || undefined,
+    // department & location are stored in description context — backend doesn't have these fields
+    // but keeping them in form for display; they can be appended to description if needed
+  });
+
+  const handleCreateJob = async (event) => {
     event.preventDefault();
-
-    setJobs((previousJobs) =>
-      previousJobs.map((item) =>
-        item.id === editingJobId
-          ? {
-              ...item,
-              ...job,
-            }
-          : item
-      )
-    );
-
-    setOpenDialog(false);
-    setEditingJobId(null);
-    setSnackbarMessage("Job updated successfully.");
-    setSnackbarOpen(true);
-
-    setJob({
-      title: "",
-      department: "",
-      location: "",
-      employmentType: "",
-      description: "",
-      skills: "",
-    });
+    setSubmitting(true);
+    try {
+      await createJob(buildPayload());
+      setOpenDialog(false);
+      showSnackbar("Job created successfully.");
+      loadJobs();
+    } catch (err) {
+      showSnackbar(err.response?.data?.message || "Failed to create job.", "error");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleArchiveJob = (jobId) => {
-    setJobs((previousJobs) =>
-      previousJobs.map((item) =>
-        item.id === jobId
-          ? {
-              ...item,
-              status: "Archived",
-            }
-          : item
-      )
-    );
-
-    setSnackbarMessage("Job archived successfully.");
-    setSnackbarOpen(true);
+  const handleUpdateJob = async (event) => {
+    event.preventDefault();
+    setSubmitting(true);
+    try {
+      await updateJob(editingJobId, buildPayload());
+      setOpenDialog(false);
+      setEditingJobId(null);
+      showSnackbar("Job updated successfully.");
+      loadJobs();
+    } catch (err) {
+      showSnackbar(err.response?.data?.message || "Failed to update job.", "error");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const activeJobs = jobs.filter(
-    (item) => item.status === "Active"
-  ).length;
+  // ──────────────────────────────────────────────────────────
+  // Archive
+  // ──────────────────────────────────────────────────────────
+  const handleArchiveJob = async (jobId) => {
+    try {
+      await archiveJob(jobId);
+      showSnackbar("Job archived successfully.");
+      loadJobs();
+    } catch (err) {
+      showSnackbar(err.response?.data?.message || "Failed to archive job.", "error");
+    }
+  };
 
-  const archivedJobs = jobs.filter(
-    (item) => item.status === "Archived"
-  ).length;
+  // ──────────────────────────────────────────────────────────
+  // Derived counts
+  // ──────────────────────────────────────────────────────────
+  const activeCount = jobs.filter((j) => j.status === "active").length;
+  const archivedCount = jobs.filter((j) => j.status === "archived").length;
 
+  // ──────────────────────────────────────────────────────────
+  // Render
+  // ──────────────────────────────────────────────────────────
   return (
     <Box>
       {/* Page Header */}
@@ -181,11 +220,7 @@ function Jobs() {
             Jobs
           </Typography>
 
-          <Typography
-            variant="body1"
-            color="text.secondary"
-            sx={{ mt: 0.5 }}
-          >
+          <Typography variant="body1" color="text.secondary" sx={{ mt: 0.5 }}>
             Manage your recruitment jobs and openings.
           </Typography>
         </Box>
@@ -200,27 +235,24 @@ function Jobs() {
         </Button>
       </Box>
 
+      {/* Fetch error banner */}
+      {fetchError && (
+        <Alert severity="error" sx={{ mb: 3 }} onClose={() => setFetchError("")}>
+          {fetchError}
+        </Alert>
+      )}
+
       {/* Job Statistics */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
         <Grid xs={12} sm={4}>
           <Card>
             <CardContent>
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 2,
-                }}
-              >
+              <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
                 <WorkIcon color="primary" />
-
                 <Box>
-                  <Typography color="text.secondary">
-                    Total Jobs
-                  </Typography>
-
+                  <Typography color="text.secondary">Total Jobs</Typography>
                   <Typography variant="h4" fontWeight={600}>
-                    {jobs.length}
+                    {loading ? <Skeleton width={40} /> : jobs.length}
                   </Typography>
                 </Box>
               </Box>
@@ -231,22 +263,12 @@ function Jobs() {
         <Grid xs={12} sm={4}>
           <Card>
             <CardContent>
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 2,
-                }}
-              >
+              <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
                 <CheckCircleIcon color="success" />
-
                 <Box>
-                  <Typography color="text.secondary">
-                    Active Jobs
-                  </Typography>
-
+                  <Typography color="text.secondary">Active Jobs</Typography>
                   <Typography variant="h4" fontWeight={600}>
-                    {activeJobs}
+                    {loading ? <Skeleton width={40} /> : activeCount}
                   </Typography>
                 </Box>
               </Box>
@@ -257,22 +279,12 @@ function Jobs() {
         <Grid xs={12} sm={4}>
           <Card>
             <CardContent>
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 2,
-                }}
-              >
+              <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
                 <ArchiveIcon color="action" />
-
                 <Box>
-                  <Typography color="text.secondary">
-                    Archived Jobs
-                  </Typography>
-
+                  <Typography color="text.secondary">Archived Jobs</Typography>
                   <Typography variant="h4" fontWeight={600}>
-                    {archivedJobs}
+                    {loading ? <Skeleton width={40} /> : archivedCount}
                   </Typography>
                 </Box>
               </Box>
@@ -283,17 +295,29 @@ function Jobs() {
 
       {/* Job Listings */}
       <Box>
-        {jobs.length === 0 ? (
+        {loading ? (
+          // Loading skeletons
+          <Grid container spacing={3}>
+            {[1, 2, 3, 4].map((n) => (
+              <Grid xs={12} md={6} key={n}>
+                <Card>
+                  <CardContent>
+                    <Skeleton variant="text" width="60%" height={32} />
+                    <Skeleton variant="text" width="40%" />
+                    <Skeleton variant="text" sx={{ mt: 2 }} />
+                    <Skeleton variant="text" />
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+        ) : jobs.length === 0 ? (
           <Card>
             <CardContent>
               <Typography variant="h6" fontWeight={600}>
                 Job Listings
               </Typography>
-
-              <Typography
-                color="text.secondary"
-                sx={{ mt: 1 }}
-              >
+              <Typography color="text.secondary" sx={{ mt: 1 }}>
                 No jobs have been created yet.
               </Typography>
             </CardContent>
@@ -301,7 +325,7 @@ function Jobs() {
         ) : (
           <Grid container spacing={3}>
             {jobs.map((item) => (
-              <Grid xs={12} md={6} key={item.id}>
+              <Grid xs={12} md={6} key={item._id}>
                 <Card>
                   <CardContent>
                     <Box
@@ -313,57 +337,20 @@ function Jobs() {
                       }}
                     >
                       <Box>
-                        <Typography
-                          variant="h6"
-                          fontWeight={600}
-                        >
+                        <Typography variant="h6" fontWeight={600}>
                           {item.title}
                         </Typography>
-
-                        <Typography
-                          color="text.secondary"
-                          sx={{ mt: 0.5 }}
-                        >
-                          {item.department}
+                        <Typography color="text.secondary" sx={{ mt: 0.5 }}>
+                          {item.experienceLevel || "Any Level"}
                         </Typography>
                       </Box>
 
                       <Chip
-                        label={item.status}
-                        color={
-                          item.status === "Active"
-                            ? "success"
-                            : "default"
-                        }
+                        label={item.status === "active" ? "Active" : "Archived"}
+                        color={item.status === "active" ? "success" : "default"}
                         size="small"
                       />
                     </Box>
-
-                    <Box
-                      sx={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 1,
-                        mt: 2,
-                      }}
-                    >
-                      <LocationOnIcon
-                        fontSize="small"
-                        color="action"
-                      />
-
-                      <Typography variant="body2">
-                        {item.location}
-                      </Typography>
-                    </Box>
-
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{ mt: 1 }}
-                    >
-                      {item.employmentType}
-                    </Typography>
 
                     <Typography
                       variant="body2"
@@ -378,38 +365,43 @@ function Jobs() {
                       {item.description}
                     </Typography>
 
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{ mt: 2 }}
-                    >
-                      Skills: {item.skills}
-                    </Typography>
+                    {/* Skills chips */}
+                    {item.requiredSkills?.length > 0 && (
+                      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, mt: 2 }}>
+                        {item.requiredSkills.slice(0, 5).map((skill) => (
+                          <Chip
+                            key={skill}
+                            label={skill}
+                            size="small"
+                            variant="outlined"
+                          />
+                        ))}
+                        {item.requiredSkills.length > 5 && (
+                          <Chip
+                            label={`+${item.requiredSkills.length - 5} more`}
+                            size="small"
+                          />
+                        )}
+                      </Box>
+                    )}
 
                     {/* Job Actions */}
-                    <Box
-                      sx={{
-                        display: "flex",
-                        gap: 1,
-                        mt: 3,
-                      }}
-                    >
+                    <Box sx={{ display: "flex", gap: 1, mt: 3 }}>
                       <Button
                         size="small"
                         variant="outlined"
                         onClick={() => handleEditJob(item)}
+                        disabled={item.status !== "active"}
                       >
                         Edit
                       </Button>
 
-                      {item.status === "Active" && (
+                      {item.status === "active" && (
                         <Button
                           size="small"
                           variant="outlined"
                           color="warning"
-                          onClick={() =>
-                            handleArchiveJob(item.id)
-                          }
+                          onClick={() => handleArchiveJob(item._id)}
                         >
                           Archive
                         </Button>
@@ -432,16 +424,10 @@ function Jobs() {
       >
         <Box
           component="form"
-          onSubmit={
-            editingJobId
-              ? handleUpdateJob
-              : handleCreateJob
-          }
+          onSubmit={editingJobId ? handleUpdateJob : handleCreateJob}
         >
           <DialogTitle>
-            {editingJobId
-              ? "Edit Job"
-              : "Create New Job"}
+            {editingJobId ? "Edit Job" : "Create New Job"}
           </DialogTitle>
 
           <DialogContent dividers>
@@ -454,59 +440,52 @@ function Jobs() {
                   name="title"
                   value={job.title}
                   onChange={handleChange}
+                  disabled={submitting}
                 />
+              </Grid>
+
+              <Grid xs={12} sm={6}>
+                <FormControl fullWidth>
+                  <InputLabel>Experience Level</InputLabel>
+                  <Select
+                    label="Experience Level"
+                    name="experienceLevel"
+                    value={job.experienceLevel}
+                    onChange={handleChange}
+                    disabled={submitting}
+                  >
+                    <MenuItem value="Entry">Entry</MenuItem>
+                    <MenuItem value="Mid">Mid</MenuItem>
+                    <MenuItem value="Senior">Senior</MenuItem>
+                  </Select>
+                </FormControl>
               </Grid>
 
               <Grid xs={12} sm={6}>
                 <TextField
                   fullWidth
-                  required
                   label="Department"
                   name="department"
                   value={job.department}
                   onChange={handleChange}
+                  disabled={submitting}
                 />
               </Grid>
 
               <Grid xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  required
-                  label="Location"
-                  name="location"
-                  value={job.location}
-                  onChange={handleChange}
-                  placeholder="e.g. Bangalore / Remote"
-                />
-              </Grid>
-
-              <Grid xs={12} sm={6}>
-                <FormControl fullWidth required>
-                  <InputLabel>
-                    Employment Type
-                  </InputLabel>
-
+                <FormControl fullWidth>
+                  <InputLabel>Employment Type</InputLabel>
                   <Select
                     label="Employment Type"
                     name="employmentType"
                     value={job.employmentType}
                     onChange={handleChange}
+                    disabled={submitting}
                   >
-                    <MenuItem value="Full-time">
-                      Full-time
-                    </MenuItem>
-
-                    <MenuItem value="Part-time">
-                      Part-time
-                    </MenuItem>
-
-                    <MenuItem value="Internship">
-                      Internship
-                    </MenuItem>
-
-                    <MenuItem value="Contract">
-                      Contract
-                    </MenuItem>
+                    <MenuItem value="Full-time">Full-time</MenuItem>
+                    <MenuItem value="Part-time">Part-time</MenuItem>
+                    <MenuItem value="Internship">Internship</MenuItem>
+                    <MenuItem value="Contract">Contract</MenuItem>
                   </Select>
                 </FormControl>
               </Grid>
@@ -521,6 +500,7 @@ function Jobs() {
                   name="description"
                   value={job.description}
                   onChange={handleChange}
+                  disabled={submitting}
                 />
               </Grid>
 
@@ -533,38 +513,48 @@ function Jobs() {
                   value={job.skills}
                   onChange={handleChange}
                   placeholder="e.g. React, Node.js, MongoDB"
-                  helperText="Separate skills with commas"
+                  helperText="Separate skills with commas — used by AI matching engine"
+                  disabled={submitting}
                 />
               </Grid>
             </Grid>
           </DialogContent>
 
           <DialogActions sx={{ p: 2 }}>
-            <Button onClick={handleCloseDialog}>
+            <Button onClick={handleCloseDialog} disabled={submitting}>
               Cancel
             </Button>
 
             <Button
               type="submit"
               variant="contained"
-              startIcon={<AddIcon />}
+              startIcon={
+                submitting ? (
+                  <CircularProgress size={18} color="inherit" />
+                ) : (
+                  <AddIcon />
+                )
+              }
+              disabled={submitting}
             >
-              {editingJobId
-                ? "Update Job"
-                : "Create Job"}
+              {submitting
+                ? "Saving..."
+                : editingJobId
+                  ? "Update Job"
+                  : "Create Job"}
             </Button>
           </DialogActions>
         </Box>
       </Dialog>
 
-      {/* Success Message */}
+      {/* Snackbar */}
       <Snackbar
         open={snackbarOpen}
-        autoHideDuration={3000}
+        autoHideDuration={4000}
         onClose={() => setSnackbarOpen(false)}
       >
         <Alert
-          severity="success"
+          severity={snackbarSeverity}
           onClose={() => setSnackbarOpen(false)}
         >
           {snackbarMessage}
