@@ -10,7 +10,7 @@ const userSchema = new mongoose.Schema({
     required: true 
   },
   companyName: { type: String }, // Specific to recruiters
-  resumeUrl: { type: String },   // Specific to applicants (AWS S3 link added later)
+  resumeUrl: { type: String },   // Specific to applicants (Cloudinary public ID / link)
 }, { timestamps: true });
 
 module.exports = mongoose.model('User', userSchema);

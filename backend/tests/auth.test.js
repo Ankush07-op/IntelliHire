@@ -1,3 +1,6 @@
+process.env.NODE_ENV = 'test';
+process.env.JWT_SECRET = process.env.JWT_SECRET || 'test_jwt_secret_key_12345';
+
 const request = require('supertest');
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
@@ -5,16 +8,24 @@ const app = require('../server');
 
 let mongoServer;
 
+jest.setTimeout(60000);
+
+const os = require('os');
+
 beforeAll(async () => {
   mongoServer = await MongoMemoryServer.create();
   const uri = mongoServer.getUri();
-  await mongoose.connect(uri);
-});
+  await mongoose.connect(uri, {
+    runtimeAdapters: { os },
+  });
+}, 60000);
 
 afterAll(async () => {
   await mongoose.disconnect();
-  await mongoServer.stop();
-});
+  if (mongoServer) {
+    await mongoServer.stop();
+  }
+}, 60000);
 
 describe('Auth Endpoints', () => {
   it('should register a new recruiter successfully', async () => {

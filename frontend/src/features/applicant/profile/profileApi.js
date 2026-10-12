@@ -1,27 +1,34 @@
-// Temporary in-memory mock. Replace the body of these functions with
-// axiosInstance calls once the real backend endpoint is ready.
+const STORAGE_KEY = "ats_candidate_profile";
 
-let MOCK_PROFILE = {
-    name: "Demo User",
-    email: "demo@test.com",
-    phone: "",
-    location: "",
-    skills: ["React", "JavaScript"],
-    experienceYears: "",
-    summary: "",
-};
-
-function delay(ms) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
+function getStoredUser() {
+  try {
+    const raw = localStorage.getItem("user") || localStorage.getItem("ats_user");
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
 }
 
 export async function getProfile() {
-    await delay(400);
-    return { ...MOCK_PROFILE };
+  const user = getStoredUser();
+  const savedProfile = localStorage.getItem(STORAGE_KEY);
+  let profile = savedProfile ? JSON.parse(savedProfile) : {};
+
+  return {
+    name: user?.name || profile.name || "Candidate",
+    email: user?.email || profile.email || "",
+    phone: profile.phone || "",
+    location: profile.location || "",
+    skills: profile.skills || ["React", "JavaScript"],
+    experienceYears: profile.experienceYears || "",
+    summary: profile.summary || "",
+    ...profile,
+  };
 }
 
 export async function updateProfile(updates) {
-    await delay(500);
-    MOCK_PROFILE = { ...MOCK_PROFILE, ...updates };
-    return { ...MOCK_PROFILE };
+  const current = await getProfile();
+  const merged = { ...current, ...updates };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+  return merged;
 }

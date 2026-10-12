@@ -1,59 +1,82 @@
-import {
-  createContext,
-  useContext,
-  useState,
-} from "react";
+import { useState, useCallback, useMemo, useContext } from "react";
+import { AuthContext } from "./authContext";
 
-const AuthContext = createContext(null);
+// Safely parse localStorage user JSON
+const getStoredUser = () => {
+  try {
+    const raw = localStorage.getItem("user") || localStorage.getItem("ats_user");
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    localStorage.removeItem("user");
+    localStorage.removeItem("ats_user");
+    return null;
+  }
+};
 
 export function AuthProvider({ children }) {
-  const [isLoggedIn, setIsLoggedIn] = useState(
-    localStorage.getItem("isRecruiterLoggedIn") === "true"
+  const [token, setToken] = useState(
+    () => localStorage.getItem("token") || localStorage.getItem("ats_token") || null
   );
+  const [user, setUser] = useState(getStoredUser);
 
-  const [recruiter, setRecruiter] = useState(() => {
-    const savedAccount = localStorage.getItem("recruiterAccount");
+  const login = useCallback((arg1, arg2) => {
+    let receivedToken;
+    let receivedUser;
 
-    if (!savedAccount) {
-      return null;
+    if (arg1 && typeof arg1 === "object" && arg1.token) {
+      // Called with { token, user } (applicant pattern)
+      receivedToken = arg1.token;
+      receivedUser = arg1.user;
+    } else {
+      // Called with (token, user) (recruiter pattern)
+      receivedToken = arg1;
+      receivedUser = arg2;
     }
 
-    try {
-      return JSON.parse(savedAccount);
-    } catch {
-      localStorage.removeItem("recruiterAccount");
-      return null;
+    if (receivedToken) {
+      localStorage.setItem("token", receivedToken);
+      localStorage.setItem("ats_token", receivedToken);
     }
-  });
+    if (receivedUser) {
+      const userStr = typeof receivedUser === "string" ? receivedUser : JSON.stringify(receivedUser);
+      localStorage.setItem("user", userStr);
+      localStorage.setItem("ats_user", userStr);
+    }
 
-  const login = (account) => {
-    localStorage.setItem("isRecruiterLoggedIn", "true");
+    setToken(receivedToken || null);
+    setUser(receivedUser || null);
+  }, []);
 
-    setIsLoggedIn(true);
-    setRecruiter(account);
-  };
+  const logout = useCallback(() => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("ats_token");
+    localStorage.removeItem("user");
+    localStorage.removeItem("ats_user");
+    setToken(null);
+    setUser(null);
+  }, []);
 
-  const logout = () => {
-    localStorage.removeItem("isRecruiterLoggedIn");
-
-    setIsLoggedIn(false);
-    setRecruiter(null);
-  };
-
-  return (
-    <AuthContext.Provider
-      value={{
-        isLoggedIn,
-        recruiter,
-        login,
-        logout,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
+  const value = useMemo(
+    () => ({
+      isLoggedIn: Boolean(token),
+      isAuthenticated: Boolean(token),
+      token,
+      user,
+      login,
+      signIn: login,
+      logout,
+      signOut: logout,
+    }),
+    [token, user, login, logout]
   );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {
-  return useContext(AuthContext);
+  const ctx = useContext(AuthContext);
+  if (!ctx) {
+    throw new Error("useAuth must be used within an AuthProvider");
+  }
+  return ctx;
 }

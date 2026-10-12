@@ -11,10 +11,11 @@ import {
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import WorkIcon from "@mui/icons-material/Work";
 import PeopleIcon from "@mui/icons-material/People";
+import ViewKanbanIcon from "@mui/icons-material/ViewKanban";
 import BarChartIcon from "@mui/icons-material/BarChart";
 import LogoutIcon from "@mui/icons-material/Logout";
 
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../context/useAuth";
 import { Link, useNavigate } from "react-router-dom";
 
 const drawerWidth = 240;
@@ -32,12 +33,17 @@ function Sidebar() {
     {
       text: "Jobs",
       icon: <WorkIcon />,
-      path: "/jobs",
+      path: "/recruiter/jobs",
     },
     {
       text: "Applications",
       icon: <PeopleIcon />,
-      path: "/applications",
+      path: "/recruiter/applications",
+    },
+    {
+      text: "Kanban",
+      icon: <ViewKanbanIcon />,
+      path: "/kanban",
     },
     {
       text: "Ranking",
@@ -48,7 +54,7 @@ function Sidebar() {
 
   const handleLogout = () => {
     logout();
-    navigate("/login", { replace: true });
+    navigate("/recruiter/login", { replace: true });
   };
 
   return (

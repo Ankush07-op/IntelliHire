@@ -1,61 +1,60 @@
-// Temporary in-memory mock. Replace the body of applyToJob() with an
-// axiosInstance multipart/form-data POST once the real backend is ready.
+import axiosInstance from "../../../api/axiosInstance";
 
-const MOCK_APPLICATIONS = [
-    {
-        id: "a1",
-        jobId: "1",
-        jobTitle: "Frontend Engineer",
-        company: "Northwind Tech",
-        status: "Interview",
-        appliedAt: "2026-09-24",
-        resumeName: "resume_jane.pdf",
-        coverLetter: "Excited to apply for this role.",
-        timeline: [
-            { status: "Applied", date: "2026-09-24" },
-            { status: "Screening", date: "2026-09-26" },
-            { status: "Interview", date: "2026-09-29" },
-        ],
-    },
-];
+function normalizeApplication(app) {
+  if (!app) return null;
+  const appliedDate = app.createdAt ? app.createdAt.slice(0, 10) : "";
+  const updatedDate = app.updatedAt ? app.updatedAt.slice(0, 10) : appliedDate;
 
-function delay(ms) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
+  const timeline = [{ status: "Applied", date: appliedDate }];
+  if (app.status && app.status !== "Applied") {
+    timeline.push({ status: app.status, date: updatedDate });
+  }
+
+  return {
+    id: app._id,
+    _id: app._id,
+    jobId: app.jobId?._id || app.jobId,
+    jobTitle: app.jobId?.title || "Job Position",
+    company: app.jobId?.companyName || "Hiring Company",
+    status: app.status || "Applied",
+    appliedAt: appliedDate,
+    resumeName: "Uploaded Resume",
+    coverLetter: app.coverLetter || "",
+    timeline,
+  };
 }
 
 // payload: { fullName, email, phone, coverLetter, resume: File }
 export async function applyToJob(jobId, jobInfo, payload) {
-    await delay(800);
+  const formData = new FormData();
+  formData.append("jobId", jobId);
+  if (payload.resume) {
+    formData.append("resume", payload.resume);
+  }
+  if (payload.coverLetter) {
+    formData.append("coverLetter", payload.coverLetter);
+  }
 
-    const alreadyApplied = MOCK_APPLICATIONS.some((a) => a.jobId === jobId);
-    if (alreadyApplied) {
-        throw new Error("You have already applied to this job.");
-    }
+  const { data } = await axiosInstance.post("/applications", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
 
-    const newApplication = {
-        id: `a${MOCK_APPLICATIONS.length + 1}`,
-        jobId,
-        jobTitle: jobInfo.title,
-        company: jobInfo.company,
-        status: "Applied",
-        appliedAt: new Date().toISOString().slice(0, 10),
-        resumeName: payload.resume.name,
-        coverLetter: payload.coverLetter,
-        timeline: [{ status: "Applied", date: new Date().toISOString().slice(0, 10) }],
-    };
-
-    MOCK_APPLICATIONS.push(newApplication);
-    return newApplication;
+  return normalizeApplication(data.application || data);
 }
 
 export async function getMyApplications() {
-    await delay(400);
-    return MOCK_APPLICATIONS;
+  const { data } = await axiosInstance.get("/applications/me");
+  const rawList = Array.isArray(data) ? data : [];
+  return rawList.map(normalizeApplication);
 }
 
 export async function getApplicationById(id) {
-    await delay(300);
-    const app = MOCK_APPLICATIONS.find((a) => a.id === id);
-    if (!app) throw new Error("Application not found");
-    return app;
+  const all = await getMyApplications();
+  const app = all.find((a) => a.id === id || a._id === id);
+  if (!app) {
+    throw new Error("Application not found");
+  }
+  return app;
 }
