@@ -186,7 +186,7 @@ function RecruiterRegister() {
 
             <Typography variant="body2" textAlign="center" sx={{ mt: 3 }}>
               Already have an account?{" "}
-              <Link href="/login" underline="hover">
+              <Link href="/recruiter/login" underline="hover">
                 Login
               </Link>
             </Typography>

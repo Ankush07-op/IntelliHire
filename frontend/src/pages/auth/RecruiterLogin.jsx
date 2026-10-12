@@ -135,7 +135,7 @@ function RecruiterLogin() {
 
             <Typography variant="body2" textAlign="center" sx={{ mt: 3 }}>
               Don't have a recruiter account?{" "}
-              <Link href="/register" underline="hover">
+              <Link href="/recruiter/register" underline="hover">
                 Register
               </Link>
             </Typography>

@@ -4,14 +4,14 @@ import { useAuth } from "../context/useAuth";
 function ProtectedRoute() {
   const { isLoggedIn, user } = useAuth();
 
-  // Not authenticated at all → redirect to login
+  // Not authenticated at all → redirect to recruiter login
   if (!isLoggedIn) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/recruiter/login" replace />;
   }
 
-  // Authenticated but wrong role → redirect to login
+  // Authenticated but not a recruiter → redirect to recruiter login
   if (user?.role !== "recruiter") {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/recruiter/login" replace />;
   }
 
   return <Outlet />;
