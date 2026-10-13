@@ -4,7 +4,7 @@ import { getApplicationById } from "../features/applicant/applications/applicati
 import StatusBadge from "../features/applicant/applications/StatusBadge.jsx";
 import StatusTimeline from "../features/applicant/applications/StatusTimeline.jsx";
 import Loader from "../components/Loader";
-
+import axiosInstance from "../api/axiosInstance";
 import { formatDate } from "../utils/formatDate";
 
 export default function ApplicationDetailPage() {
@@ -12,6 +12,7 @@ export default function ApplicationDetailPage() {
   const [application, setApplication] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [loadingResume, setLoadingResume] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -21,6 +22,21 @@ export default function ApplicationDetailPage() {
       .finally(() => setLoading(false));
   }, [id]);
 
+  const handleViewResume = async () => {
+    setLoadingResume(true);
+    try {
+      const { data } = await axiosInstance.get(`/applications/${id}/resume`);
+      const target = data.viewUrl || data.downloadUrl;
+      if (target) {
+        window.open(target, "_blank", "noopener,noreferrer");
+      }
+    } catch {
+      alert("Could not load resume document link.");
+    } finally {
+      setLoadingResume(false);
+    }
+  };
+
   if (loading) return <Loader label="Loading application..." />;
 
   if (error) {
@@ -29,7 +45,7 @@ export default function ApplicationDetailPage() {
         <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
           {error}
         </div>
-        <Link to="/applications" className="inline-block mt-4 text-sm text-blue-700 font-medium">
+        <Link to="/my-applications" className="inline-block mt-4 text-sm text-blue-700 font-medium">
           ← Back to my applications
         </Link>
       </div>
@@ -38,7 +54,7 @@ export default function ApplicationDetailPage() {
 
   return (
     <div className="max-w-2xl mx-auto">
-      <Link to="/applications" className="text-sm text-blue-700 font-medium">
+      <Link to="/my-applications" className="text-sm text-blue-700 font-medium">
         ← Back to my applications
       </Link>
 
@@ -56,8 +72,19 @@ export default function ApplicationDetailPage() {
         </p>
 
         <div className="mt-6 pt-6 border-t border-slate-100">
-          <h2 className="text-sm font-semibold text-slate-900 mb-2">Resume</h2>
-          <p className="text-sm text-slate-600">📄 {application.resumeName}</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-semibold text-slate-900 mb-0.5">Resume Document</h2>
+              <p className="text-sm text-slate-600">📄 {application.resumeName || "Submitted Resume"}</p>
+            </div>
+            <button
+              onClick={handleViewResume}
+              disabled={loadingResume}
+              className="text-xs font-semibold px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg transition"
+            >
+              {loadingResume ? "Loading link..." : "View / Download ↗"}
+            </button>
+          </div>
         </div>
 
         {application.coverLetter && (

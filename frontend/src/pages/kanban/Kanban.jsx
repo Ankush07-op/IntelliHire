@@ -8,12 +8,17 @@ import {
   CardContent,
   Chip,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   FormControl,
   Grid,
   MenuItem,
   Select,
   Skeleton,
   Snackbar,
+  TextField,
   Typography,
 } from "@mui/material";
 
@@ -50,6 +55,11 @@ function Kanban() {
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const [snackbarSeverity, setSnackbarSeverity] = useState("success");
+
+  // Interview dialog state
+  const [interviewOpen, setInterviewOpen] = useState(false);
+  const [interviewTargetId, setInterviewTargetId] = useState(null);
+  const [interviewDetails, setInterviewDetails] = useState("");
 
   // ── Load recruiter's jobs for the selector ─────────────────
   useEffect(() => {
@@ -95,10 +105,17 @@ function Kanban() {
   }, [selectedJobId]);
 
   // ── Move card to a new status column ──────────────────────
-  const handleMoveCard = async (applicationId, newStatus) => {
+  const handleMoveCard = async (applicationId, newStatus, customDetails = null) => {
+    if (newStatus === "Interview" && !customDetails) {
+      setInterviewTargetId(applicationId);
+      setInterviewDetails("Date: Tomorrow, 2:00 PM IST\nLink: https://meet.google.com/interview\nNotes: Technical discussion with team.");
+      setInterviewOpen(true);
+      return;
+    }
+
     setMovingId(applicationId);
     try {
-      await updateApplicationStatus(applicationId, newStatus);
+      await updateApplicationStatus(applicationId, newStatus, customDetails);
       setApplications((prev) =>
         prev.map((app) =>
           app._id === applicationId ? { ...app, status: newStatus } : app
@@ -317,6 +334,48 @@ function Kanban() {
           })}
         </Grid>
       )}
+
+      {/* Interview Scheduling Dialog */}
+      <Dialog
+        open={interviewOpen}
+        onClose={() => setInterviewOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ fontWeight: 700 }}>
+          Schedule Interview Invitation
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Provide interview date, time, meeting link, or instructions. An automated email invitation will be dispatched to the candidate.
+          </Typography>
+          <TextField
+            autoFocus
+            multiline
+            rows={4}
+            fullWidth
+            label="Interview Details & Agenda"
+            value={interviewDetails}
+            onChange={(e) => setInterviewDetails(e.target.value)}
+            placeholder="Date: Tomorrow, 2:00 PM IST&#10;Platform: Google Meet&#10;Link: https://meet.google.com/xyz-abcd-efg"
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setInterviewOpen(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            color="info"
+            onClick={async () => {
+              const targetId = interviewTargetId;
+              const details = interviewDetails;
+              setInterviewOpen(false);
+              await handleMoveCard(targetId, "Interview", details);
+            }}
+          >
+            Confirm & Send Invite
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Snackbar */}
       <Snackbar

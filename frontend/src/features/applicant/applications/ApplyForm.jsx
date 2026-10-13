@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { applyToJob } from "./applicationsApi";
+import { getProfile } from "../profile/profileApi";
 import ResumeUploader from "./ResumeUploader";
 import { useAuth } from "../auth/AuthContext";
 
@@ -12,7 +13,7 @@ export default function ApplyForm({ job }) {
     const [form, setForm] = useState({
         fullName: user?.name || "",
         email: user?.email || "",
-        phone: "",
+        phone: user?.phone || "",
         coverLetter: "",
     });
     const [resume, setResume] = useState(null);
@@ -20,6 +21,19 @@ export default function ApplyForm({ job }) {
     const [formError, setFormError] = useState("");
     const [submitting, setSubmitting] = useState(false);
     const [success, setSuccess] = useState(false);
+
+    useEffect(() => {
+        getProfile().then((prof) => {
+            if (prof) {
+                setForm((prev) => ({
+                    ...prev,
+                    fullName: prev.fullName || prof.name || "",
+                    email: prev.email || prof.email || "",
+                    phone: prev.phone || prof.phone || "",
+                }));
+            }
+        }).catch(() => {});
+    }, []);
 
     const handleChange = (e) => {
         setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));

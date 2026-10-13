@@ -32,7 +32,7 @@ import PsychologyIcon from "@mui/icons-material/Psychology";
 import { fetchJobs } from "../../services/jobService";
 import {
   fetchApplicationsByJob,
-  fetchApplicationAnalysis,
+  fetchJobRankings,
   reanalyzeApplication,
 } from "../../services/applicationService";
 
@@ -87,22 +87,29 @@ function Ranking() {
     setLoading(true);
     setFetchError("");
     try {
-      const applications = await fetchApplicationsByJob(jobId);
+      // Parallel fetch: get indexed ranking aggregation & complete application records
+      const [rankingData, applications] = await Promise.all([
+        fetchJobRankings(jobId).catch(() => ({ rankings: [] })),
+        fetchApplicationsByJob(jobId),
+      ]);
 
-      // Fetch all AI analyses in parallel (ignore individual failures)
-      const analysisResults = await Promise.allSettled(
-        applications.map((app) => fetchApplicationAnalysis(app._id))
-      );
+      const rankedMap = new Map();
+      (rankingData.rankings || []).forEach((r) => {
+        const appId = r.applicationId?._id?.toString() || r.applicationId?.toString();
+        if (appId) {
+          rankedMap.set(appId, r);
+        }
+      });
 
       const enriched = applications
-        .map((app, idx) => {
-          const analysis =
-            analysisResults[idx].status === "fulfilled"
-              ? analysisResults[idx].value
-              : null;
+        .map((app) => {
+          const analysis = rankedMap.get(app._id?.toString());
           return {
             ...app,
-            matchScore: analysis?.matchScore ?? null,
+            matchScore: analysis ? (analysis.score ?? analysis.matchScore ?? null) : null,
+            experienceYears: analysis?.experienceYears ?? null,
+            matchedSkills: analysis?.matchedSkills ?? [],
+            missingSkills: analysis?.missingSkills ?? [],
             analysisSummary: analysis?.summary ?? null,
           };
         })

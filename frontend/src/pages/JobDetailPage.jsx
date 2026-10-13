@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { getJobById } from "../features/applicant/jobs/jobsApi";
+import { getMyApplications } from "../features/applicant/applications/applicationsApi";
 import { useAuth } from "../features/applicant/auth/AuthContext";
 import Loader from "../components/Loader";
+import StatusBadge from "../features/applicant/applications/StatusBadge";
 import { formatDate } from "../utils/formatDate";
 
 
@@ -12,6 +14,7 @@ export default function JobDetailPage() {
   const { isAuthenticated } = useAuth();
 
   const [job, setJob] = useState(null);
+  const [existingApp, setExistingApp] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -19,11 +22,24 @@ export default function JobDetailPage() {
     setLoading(true);
     setError("");
 
-    getJobById(id)
-      .then(setJob)
+    const promises = [getJobById(id)];
+    if (isAuthenticated) {
+      promises.push(getMyApplications().catch(() => []));
+    }
+
+    Promise.all(promises)
+      .then(([jobData, myApps = []]) => {
+        setJob(jobData);
+        if (Array.isArray(myApps)) {
+          const matched = myApps.find(
+            (app) => String(app.jobId) === String(id) || String(app.jobId?._id) === String(id)
+          );
+          setExistingApp(matched || null);
+        }
+      })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [id]);
+  }, [id, isAuthenticated]);
 
   const handleApplyClick = () => {
     if (isAuthenticated) {
@@ -85,12 +101,35 @@ export default function JobDetailPage() {
           Posted on {formatDate(job.postedAt)}
         </p>
 
-        <button
-          onClick={handleApplyClick}
-          className="w-full sm:w-auto mt-6 bg-blue-600 text-white font-semibold rounded-lg px-6 py-2.5 hover:bg-blue-700"
-        >
-          Apply for this job
-        </button>
+        {existingApp ? (
+          <div className="mt-6 p-4 rounded-xl border border-blue-200 bg-blue-50/70 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-emerald-700 font-semibold text-sm flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                  You have already applied for this position
+                </span>
+                <StatusBadge status={existingApp.status} />
+              </div>
+              <p className="text-xs text-slate-500 mt-1">
+                Applied on {formatDate(existingApp.appliedAt)}
+              </p>
+            </div>
+            <button
+              onClick={() => navigate(`/applications/${existingApp.id}`)}
+              className="w-full sm:w-auto text-xs font-semibold px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shrink-0"
+            >
+              View My Application →
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={handleApplyClick}
+            className="w-full sm:w-auto mt-6 bg-blue-600 text-white font-semibold rounded-lg px-6 py-2.5 hover:bg-blue-700 transition-colors"
+          >
+            Apply for this job
+          </button>
+        )}
       </div>
     </div>
   );
