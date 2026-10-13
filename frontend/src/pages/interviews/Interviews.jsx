@@ -9,6 +9,8 @@ import {
   DialogContent,
   DialogContentText,
   DialogTitle,
+  InputAdornment,
+  MenuItem,
   Paper,
   Table,
   TableBody,
@@ -19,10 +21,11 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+
 import EventIcon from "@mui/icons-material/Event";
 import CancelOutlinedIcon from "@mui/icons-material/CancelOutlined";
 import EditCalendarIcon from "@mui/icons-material/EditCalendar";
-import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
+import SearchIcon from "@mui/icons-material/Search";
 
 const STORAGE_KEY = "interviewInvitations";
 
@@ -50,6 +53,11 @@ function Interviews() {
   const [newDate, setNewDate] = useState("");
   const [newTime, setNewTime] = useState("");
   const [error, setError] = useState("");
+
+  // Day 21: Search and filter state
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [typeFilter, setTypeFilter] = useState("All");
 
   useEffect(() => {
     try {
@@ -188,8 +196,54 @@ function Interviews() {
     }
   };
 
+  // Collect interview types dynamically from saved invitations.
+  const interviewTypes = [
+    ...new Set(
+      interviews
+        .map((interview) => interview.type)
+        .filter((type) => typeof type === "string" && type.trim())
+    ),
+  ].sort((a, b) => a.localeCompare(b));
+
+  // Apply search, status, and interview-type filters.
+  const filteredInterviews = [...interviews]
+    .reverse()
+    .filter((interview) => {
+      const query = searchTerm.trim().toLowerCase();
+
+      const candidateName = String(interview.candidateName || "").toLowerCase();
+      const candidateEmail = String(
+        interview.candidateEmail || ""
+      ).toLowerCase();
+
+      const matchesSearch =
+        candidateName.includes(query) || candidateEmail.includes(query);
+
+      const status = interview.status || "Scheduled";
+
+      const matchesStatus =
+        statusFilter === "All" || status === statusFilter;
+
+      const matchesType =
+        typeFilter === "All" || interview.type === typeFilter;
+
+      return matchesSearch && matchesStatus && matchesType;
+    });
+
+  const clearFilters = () => {
+    setSearchTerm("");
+    setStatusFilter("All");
+    setTypeFilter("All");
+  };
+
+  const filtersActive =
+    searchTerm.trim() !== "" ||
+    statusFilter !== "All" ||
+    typeFilter !== "All";
+
   return (
     <Box sx={{ width: "100%", minWidth: 0 }}>
+      {/* Page heading */}
       <Box
         sx={{
           display: "flex",
@@ -212,11 +266,16 @@ function Interviews() {
       </Box>
 
       {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError("")}>
+        <Alert
+          severity="error"
+          sx={{ mb: 2 }}
+          onClose={() => setError("")}
+        >
           {error}
         </Alert>
       )}
 
+      {/* Total invitations */}
       <Paper variant="outlined" sx={{ p: 2, mb: 3, borderRadius: 2 }}>
         <Typography color="text.secondary" variant="body2">
           Total saved invitations
@@ -224,6 +283,88 @@ function Interviews() {
 
         <Typography variant="h4" fontWeight={700}>
           {interviews.length}
+        </Typography>
+      </Paper>
+
+      {/* Day 21: Search and filters */}
+      <Paper variant="outlined" sx={{ p: 2, mb: 3, borderRadius: 2 }}>
+        <Typography variant="h6" fontWeight={600} sx={{ mb: 2 }}>
+          Search and Filter Interviews
+        </Typography>
+
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: {
+              xs: "1fr",
+              sm: "repeat(2, minmax(0, 1fr))",
+              md: "2fr 1fr 1fr auto",
+            },
+            gap: 2,
+            alignItems: "center",
+          }}
+        >
+          <TextField
+            fullWidth
+            size="small"
+            label="Search candidate"
+            placeholder="Name or email"
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon color="action" />
+                  </InputAdornment>
+                ),
+              },
+            }}
+          />
+
+          <TextField
+            select
+            fullWidth
+            size="small"
+            label="Status"
+            value={statusFilter}
+            onChange={(event) => setStatusFilter(event.target.value)}
+          >
+            <MenuItem value="All">All statuses</MenuItem>
+            <MenuItem value="Scheduled">Scheduled</MenuItem>
+            <MenuItem value="Completed">Completed</MenuItem>
+            <MenuItem value="Cancelled">Cancelled</MenuItem>
+          </TextField>
+
+          <TextField
+            select
+            fullWidth
+            size="small"
+            label="Interview type"
+            value={typeFilter}
+            onChange={(event) => setTypeFilter(event.target.value)}
+          >
+            <MenuItem value="All">All types</MenuItem>
+
+            {interviewTypes.map((type) => (
+              <MenuItem key={type} value={type}>
+                {type}
+              </MenuItem>
+            ))}
+          </TextField>
+
+          <Button
+            variant="outlined"
+            onClick={clearFilters}
+            disabled={!filtersActive}
+            sx={{ whiteSpace: "nowrap" }}
+          >
+            Clear Filters
+          </Button>
+        </Box>
+
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+          Showing {filteredInterviews.length} of {interviews.length} interviews
         </Typography>
       </Paper>
 
@@ -236,7 +377,7 @@ function Interviews() {
         <TableContainer
           component={Paper}
           variant="outlined"
-          sx={{ borderRadius: 2 }}
+          sx={{ borderRadius: 2, overflowX: "auto" }}
         >
           <Table>
             <TableHead>
@@ -251,7 +392,21 @@ function Interviews() {
             </TableHead>
 
             <TableBody>
-              {[...interviews].reverse().map((interview) => {
+              {filteredInterviews.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                    <Typography color="text.secondary">
+                      No interviews match your search or filters.
+                    </Typography>
+
+                    <Button onClick={clearFilters} sx={{ mt: 1 }}>
+                      Clear Filters
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              )}
+
+              {filteredInterviews.map((interview) => {
                 const cancelled = interview.status === "Cancelled";
                 const completed = interview.status === "Completed";
                 const locked = cancelled || completed;
@@ -264,7 +419,10 @@ function Interviews() {
                       </Typography>
 
                       {interview.candidateEmail && (
-                        <Typography variant="body2" color="text.secondary">
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                        >
                           {interview.candidateEmail}
                         </Typography>
                       )}
@@ -320,7 +478,6 @@ function Interviews() {
                         <Button
                           size="small"
                           color="success"
-                          startIcon={<CheckCircleOutlineIcon />}
                           disabled={locked}
                           onClick={() => {
                             setError("");
@@ -330,7 +487,7 @@ function Interviews() {
                             });
                           }}
                         >
-                          {completed ? "Completed" : "Mark Completed"}
+                          {completed ? "✓ Completed" : "✓ Mark Completed"}
                         </Button>
                       </Box>
                     </TableCell>
@@ -342,11 +499,16 @@ function Interviews() {
         </TableContainer>
       )}
 
-      <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+      <Typography
+        variant="body2"
+        color="text.secondary"
+        sx={{ mt: 2 }}
+      >
         Interview changes are saved locally in this browser. They do not send
         emails or notify candidates.
       </Typography>
 
+      {/* Cancel or complete confirmation dialog */}
       <Dialog
         open={Boolean(selectedInterview)}
         onClose={() => setSelectedInterview(null)}
@@ -380,7 +542,9 @@ function Interviews() {
           </Button>
 
           <Button
-            color={selectedInterview?.action === "Complete" ? "success" : "error"}
+            color={
+              selectedInterview?.action === "Complete" ? "success" : "error"
+            }
             variant="contained"
             onClick={confirmInterviewAction}
           >
@@ -391,6 +555,7 @@ function Interviews() {
         </DialogActions>
       </Dialog>
 
+      {/* Reschedule dialog */}
       <Dialog
         open={Boolean(rescheduleInterview)}
         onClose={() => setRescheduleInterview(null)}
