@@ -16,16 +16,36 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TextField,
   Typography,
 } from "@mui/material";
 import EventIcon from "@mui/icons-material/Event";
 import CancelOutlinedIcon from "@mui/icons-material/CancelOutlined";
+import EditCalendarIcon from "@mui/icons-material/EditCalendar";
 
 const STORAGE_KEY = "interviewInvitations";
+
+const getToday = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const getCurrentTime = () => {
+  const now = new Date();
+  return `${String(now.getHours()).padStart(2, "0")}:${String(
+    now.getMinutes()
+  ).padStart(2, "0")}`;
+};
 
 function Interviews() {
   const [interviews, setInterviews] = useState([]);
   const [selectedInterview, setSelectedInterview] = useState(null);
+  const [rescheduleInterview, setRescheduleInterview] = useState(null);
+  const [newDate, setNewDate] = useState("");
+  const [newTime, setNewTime] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -71,9 +91,7 @@ function Interviews() {
     );
   };
 
-  const confirmCancellation = () => {
-    if (!selectedInterview) return;
-
+  const updateInvitation = (id, changes) => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       const current = saved ? JSON.parse(saved) : [];
@@ -83,18 +101,69 @@ function Interviews() {
       }
 
       const updated = current.map((interview) =>
-        interview.id === selectedInterview.id
-          ? { ...interview, status: "Cancelled" }
-          : interview
+        interview.id === id ? { ...interview, ...changes } : interview
       );
 
       localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
       setInterviews(updated);
-      setSelectedInterview(null);
       setError("");
+      return true;
     } catch {
-      setError("Unable to cancel this interview. Please try again.");
+      setError("Unable to update the interview. Please try again.");
+      return false;
     }
+  };
+
+  const confirmCancellation = () => {
+    if (!selectedInterview) return;
+
+    const success = updateInvitationStatus(
+      selectedInterview.id,
+      "Cancelled"
+    );
+
+    if (success) setSelectedInterview(null);
+  };
+
+  const updateInvitationStatus = (id, status) =>
+    updateInvitation(id, { status });
+
+  const openReschedule = (interview) => {
+    setError("");
+    setNewDate(interview.date || "");
+    setNewTime(interview.time || "");
+    setRescheduleInterview(interview);
+  };
+
+  const confirmReschedule = () => {
+    if (!rescheduleInterview || !newDate || !newTime) {
+      setError("Please select both a new date and time.");
+      return;
+    }
+
+    const scheduledDateTime = new Date(`${newDate}T${newTime}`);
+
+    if (Number.isNaN(scheduledDateTime.getTime())) {
+      setError("Please enter a valid date and time.");
+      return;
+    }
+
+    if (scheduledDateTime <= new Date()) {
+      setError("The new interview date and time must be in the future.");
+      return;
+    }
+
+    const success = updateInvitation(
+      rescheduleInterview.id,
+      {
+        date: newDate,
+        time: newTime,
+        status: "Scheduled",
+        updatedAt: new Date().toISOString(),
+      }
+    );
+
+    if (success) setRescheduleInterview(null);
   };
 
   const getStatusColor = (status) => {
@@ -198,15 +267,29 @@ function Interviews() {
                     </TableCell>
 
                     <TableCell>
-                      <Button
-                        size="small"
-                        color="error"
-                        startIcon={<CancelOutlinedIcon />}
-                        disabled={cancelled}
-                        onClick={() => setSelectedInterview(interview)}
-                      >
-                        {cancelled ? "Cancelled" : "Cancel"}
-                      </Button>
+                      <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                        <Button
+                          size="small"
+                          startIcon={<EditCalendarIcon />}
+                          disabled={cancelled}
+                          onClick={() => openReschedule(interview)}
+                        >
+                          Reschedule
+                        </Button>
+
+                        <Button
+                          size="small"
+                          color="error"
+                          startIcon={<CancelOutlinedIcon />}
+                          disabled={cancelled}
+                          onClick={() => {
+                            setError("");
+                            setSelectedInterview(interview);
+                          }}
+                        >
+                          {cancelled ? "Cancelled" : "Cancel"}
+                        </Button>
+                      </Box>
                     </TableCell>
                   </TableRow>
                 );
@@ -217,8 +300,8 @@ function Interviews() {
       )}
 
       <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-        Invitations are stored locally in this browser. Cancellation does not
-        send an email or notify the candidate.
+        Interview changes are saved locally in this browser. They do not send
+        emails or notify candidates.
       </Typography>
 
       <Dialog
@@ -248,6 +331,77 @@ function Interviews() {
             onClick={confirmCancellation}
           >
             Confirm Cancellation
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(rescheduleInterview)}
+        onClose={() => setRescheduleInterview(null)}
+        fullWidth
+        maxWidth="xs"
+        aria-labelledby="reschedule-interview-title"
+      >
+        <DialogTitle id="reschedule-interview-title">
+          Reschedule Interview
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ mb: 1 }}>
+            Choose a new date and time for{" "}
+            <strong>
+              {rescheduleInterview?.candidateName || "this candidate"}
+            </strong>.
+          </DialogContentText>
+
+          {error && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {error}
+            </Alert>
+          )}
+
+          <TextField
+            fullWidth
+            required
+            type="date"
+            label="New Interview Date"
+            value={newDate}
+            onChange={(event) => {
+              setNewDate(event.target.value);
+              setError("");
+            }}
+            margin="normal"
+            slotProps={{
+              inputLabel: { shrink: true },
+              htmlInput: { min: getToday() },
+            }}
+          />
+
+          <TextField
+            fullWidth
+            required
+            type="time"
+            label="New Interview Time"
+            value={newTime}
+            onChange={(event) => {
+              setNewTime(event.target.value);
+              setError("");
+            }}
+            margin="normal"
+            slotProps={{
+              inputLabel: { shrink: true },
+              htmlInput: {
+                min: newDate === getToday() ? getCurrentTime() : undefined,
+              },
+            }}
+          />
+        </DialogContent>
+
+        <DialogActions>
+          <Button onClick={() => setRescheduleInterview(null)}>
+            Keep Current Schedule
+          </Button>
+          <Button variant="contained" onClick={confirmReschedule}>
+            Save New Schedule
           </Button>
         </DialogActions>
       </Dialog>
