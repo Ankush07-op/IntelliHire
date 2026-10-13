@@ -22,6 +22,7 @@ import {
 import EventIcon from "@mui/icons-material/Event";
 import CancelOutlinedIcon from "@mui/icons-material/CancelOutlined";
 import EditCalendarIcon from "@mui/icons-material/EditCalendar";
+import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 
 const STORAGE_KEY = "interviewInvitations";
 
@@ -30,11 +31,13 @@ const getToday = () => {
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, "0");
   const day = String(now.getDate()).padStart(2, "0");
+
   return `${year}-${month}-${day}`;
 };
 
 const getCurrentTime = () => {
   const now = new Date();
+
   return `${String(now.getHours()).padStart(2, "0")}:${String(
     now.getMinutes()
   ).padStart(2, "0")}`;
@@ -52,6 +55,7 @@ function Interviews() {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       const parsed = saved ? JSON.parse(saved) : [];
+
       setInterviews(Array.isArray(parsed) ? parsed : []);
     } catch {
       setInterviews([]);
@@ -85,10 +89,10 @@ function Interviews() {
       return time;
     }
 
-    return new Date(2000, 0, 1, hours, minutes).toLocaleTimeString(
-      [],
-      { hour: "numeric", minute: "2-digit" }
-    );
+    return new Date(2000, 0, 1, hours, minutes).toLocaleTimeString([], {
+      hour: "numeric",
+      minute: "2-digit",
+    });
   };
 
   const updateInvitation = (id, changes) => {
@@ -107,6 +111,7 @@ function Interviews() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
       setInterviews(updated);
       setError("");
+
       return true;
     } catch {
       setError("Unable to update the interview. Please try again.");
@@ -114,19 +119,24 @@ function Interviews() {
     }
   };
 
-  const confirmCancellation = () => {
+  const updateInvitationStatus = (id, status) =>
+    updateInvitation(id, {
+      status,
+      updatedAt: new Date().toISOString(),
+    });
+
+  const confirmInterviewAction = () => {
     if (!selectedInterview) return;
 
-    const success = updateInvitationStatus(
-      selectedInterview.id,
-      "Cancelled"
-    );
+    const status =
+      selectedInterview.action === "Complete" ? "Completed" : "Cancelled";
 
-    if (success) setSelectedInterview(null);
+    const success = updateInvitationStatus(selectedInterview.id, status);
+
+    if (success) {
+      setSelectedInterview(null);
+    }
   };
-
-  const updateInvitationStatus = (id, status) =>
-    updateInvitation(id, { status });
 
   const openReschedule = (interview) => {
     setError("");
@@ -153,17 +163,18 @@ function Interviews() {
       return;
     }
 
-    const success = updateInvitation(
-      rescheduleInterview.id,
-      {
-        date: newDate,
-        time: newTime,
-        status: "Scheduled",
-        updatedAt: new Date().toISOString(),
-      }
-    );
+    const success = updateInvitation(rescheduleInterview.id, {
+      date: newDate,
+      time: newTime,
+      status: "Scheduled",
+      updatedAt: new Date().toISOString(),
+    });
 
-    if (success) setRescheduleInterview(null);
+    if (success) {
+      setRescheduleInterview(null);
+      setNewDate("");
+      setNewTime("");
+    }
   };
 
   const getStatusColor = (status) => {
@@ -188,10 +199,12 @@ function Interviews() {
         }}
       >
         <EventIcon color="primary" sx={{ fontSize: 32 }} />
+
         <Box>
           <Typography variant="h4" fontWeight={700}>
             Scheduled Interviews
           </Typography>
+
           <Typography color="text.secondary" sx={{ mt: 0.5 }}>
             View and manage interview invitations saved on this device.
           </Typography>
@@ -208,6 +221,7 @@ function Interviews() {
         <Typography color="text.secondary" variant="body2">
           Total saved invitations
         </Typography>
+
         <Typography variant="h4" fontWeight={700}>
           {interviews.length}
         </Typography>
@@ -239,6 +253,8 @@ function Interviews() {
             <TableBody>
               {[...interviews].reverse().map((interview) => {
                 const cancelled = interview.status === "Cancelled";
+                const completed = interview.status === "Completed";
+                const locked = cancelled || completed;
 
                 return (
                   <TableRow key={interview.id} hover>
@@ -246,6 +262,7 @@ function Interviews() {
                       <Typography fontWeight={600}>
                         {interview.candidateName || "Candidate"}
                       </Typography>
+
                       {interview.candidateEmail && (
                         <Typography variant="body2" color="text.secondary">
                           {interview.candidateEmail}
@@ -267,11 +284,18 @@ function Interviews() {
                     </TableCell>
 
                     <TableCell>
-                      <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          gap: 1,
+                          flexWrap: "wrap",
+                          minWidth: 150,
+                        }}
+                      >
                         <Button
                           size="small"
                           startIcon={<EditCalendarIcon />}
-                          disabled={cancelled}
+                          disabled={locked}
                           onClick={() => openReschedule(interview)}
                         >
                           Reschedule
@@ -281,13 +305,32 @@ function Interviews() {
                           size="small"
                           color="error"
                           startIcon={<CancelOutlinedIcon />}
-                          disabled={cancelled}
+                          disabled={locked}
                           onClick={() => {
                             setError("");
-                            setSelectedInterview(interview);
+                            setSelectedInterview({
+                              ...interview,
+                              action: "Cancel",
+                            });
                           }}
                         >
                           {cancelled ? "Cancelled" : "Cancel"}
+                        </Button>
+
+                        <Button
+                          size="small"
+                          color="success"
+                          startIcon={<CheckCircleOutlineIcon />}
+                          disabled={locked}
+                          onClick={() => {
+                            setError("");
+                            setSelectedInterview({
+                              ...interview,
+                              action: "Complete",
+                            });
+                          }}
+                        >
+                          {completed ? "Completed" : "Mark Completed"}
                         </Button>
                       </Box>
                     </TableCell>
@@ -307,30 +350,43 @@ function Interviews() {
       <Dialog
         open={Boolean(selectedInterview)}
         onClose={() => setSelectedInterview(null)}
-        aria-labelledby="cancel-interview-title"
+        aria-labelledby="interview-action-title"
       >
-        <DialogTitle id="cancel-interview-title">
-          Cancel interview?
+        <DialogTitle id="interview-action-title">
+          {selectedInterview?.action === "Complete"
+            ? "Mark interview as completed?"
+            : "Cancel interview?"}
         </DialogTitle>
+
         <DialogContent>
           <DialogContentText>
-            Are you sure you want to cancel the interview for{" "}
+            Are you sure you want to{" "}
+            {selectedInterview?.action === "Complete"
+              ? "mark the interview as completed for"
+              : "cancel the interview for"}{" "}
             <strong>
               {selectedInterview?.candidateName || "this candidate"}
             </strong>
-            ? The invitation status will be changed to Cancelled.
+            ?{" "}
+            {selectedInterview?.action === "Complete"
+              ? "The status will be changed to Completed."
+              : "The status will be changed to Cancelled."}
           </DialogContentText>
         </DialogContent>
+
         <DialogActions>
           <Button onClick={() => setSelectedInterview(null)}>
-            Keep Interview
+            Go Back
           </Button>
+
           <Button
-            color="error"
+            color={selectedInterview?.action === "Complete" ? "success" : "error"}
             variant="contained"
-            onClick={confirmCancellation}
+            onClick={confirmInterviewAction}
           >
-            Confirm Cancellation
+            {selectedInterview?.action === "Complete"
+              ? "Confirm Completion"
+              : "Confirm Cancellation"}
           </Button>
         </DialogActions>
       </Dialog>
@@ -345,12 +401,14 @@ function Interviews() {
         <DialogTitle id="reschedule-interview-title">
           Reschedule Interview
         </DialogTitle>
+
         <DialogContent>
           <DialogContentText sx={{ mb: 1 }}>
             Choose a new date and time for{" "}
             <strong>
               {rescheduleInterview?.candidateName || "this candidate"}
-            </strong>.
+            </strong>
+            .
           </DialogContentText>
 
           {error && (
@@ -400,6 +458,7 @@ function Interviews() {
           <Button onClick={() => setRescheduleInterview(null)}>
             Keep Current Schedule
           </Button>
+
           <Button variant="contained" onClick={confirmReschedule}>
             Save New Schedule
           </Button>
