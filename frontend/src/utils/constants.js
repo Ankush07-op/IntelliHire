@@ -3,7 +3,8 @@ export const USER_KEY = "ats_user";
 
 export const APPLICATION_STATUS = {
     APPLIED: "Applied",
-    SCREENING: "Screening",
+    SHORTLISTED: "Shortlisted",
+    SCREENING: "Shortlisted",
     INTERVIEW: "Interview",
     OFFERED: "Offered",
     REJECTED: "Rejected",

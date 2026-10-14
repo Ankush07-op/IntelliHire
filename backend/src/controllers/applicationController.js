@@ -206,11 +206,13 @@ const getResumeDownloadUrl = async (req, res) => {
       });
     }
 
-    // Generate 15-minute expiring signed URL from Cloudinary public ID
-    const downloadUrl = await getPresignedDownloadUrl(application.resumeUrl);
+    // Generate 15-minute expiring signed URLs from Cloudinary public ID
+    const inlineUrl = await getPresignedDownloadUrl(application.resumeUrl, true);
+    const downloadUrl = await getPresignedDownloadUrl(application.resumeUrl, false);
 
     res.json({
       downloadUrl,
+      viewUrl: inlineUrl,
       expiresIn: 900, // 15 minutes in seconds
     });
   } catch (error) {

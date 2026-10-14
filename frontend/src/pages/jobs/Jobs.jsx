@@ -16,10 +16,11 @@ import {
   MenuItem,
   Select,
   Skeleton,
-  Snackbar,
   TextField,
   Typography,
 } from "@mui/material";
+
+import { useToast } from "../../context/ToastContext";
 
 import AddIcon from "@mui/icons-material/Add";
 import WorkIcon from "@mui/icons-material/Work";
@@ -34,6 +35,7 @@ import {
   updateJob,
   archiveJob,
 } from "../../services/jobService";
+import { useAuth } from "../../context/useAuth";
 
 // Empty form state
 const EMPTY_FORM = {
@@ -47,10 +49,11 @@ const EMPTY_FORM = {
 };
 
 function Jobs() {
+  const { user } = useAuth();
+  const recruiterId = user?._id || user?.id;
+  const { showToast } = useToast();
+
   const [openDialog, setOpenDialog] = useState(false);
-  const [snackbarOpen, setSnackbarOpen] = useState(false);
-  const [snackbarMessage, setSnackbarMessage] = useState("");
-  const [snackbarSeverity, setSnackbarSeverity] = useState("success");
 
   // Jobs from backend
   const [jobs, setJobs] = useState([]);
@@ -62,38 +65,64 @@ function Jobs() {
   const [submitting, setSubmitting] = useState(false);
   const [job, setJob] = useState(EMPTY_FORM);
 
+  // ── Helpers ───────────────────────────────────────────────────
+  const showSnackbar = useCallback((message, severity = "success") => {
+    showToast(message, severity);
+  }, [showToast]);
+
   // ──────────────────────────────────────────────────────────
-  // Fetch all recruiter's jobs (all statuses via query)
+  // Fetch recruiter's jobs (scoped by recruiterId)
   // ──────────────────────────────────────────────────────────
   const loadJobs = useCallback(async () => {
     setLoading(true);
     setFetchError("");
     try {
-      // Fetch active + archived by not passing a status filter
+      const params = recruiterId ? { recruiterId } : {};
       const [activeData, archivedData] = await Promise.all([
-        fetchJobs({ status: "active" }),
-        fetchJobs({ status: "archived" }),
+        fetchJobs({ ...params, status: "active" }),
+        fetchJobs({ ...params, status: "archived" }),
       ]);
-      setJobs([...activeData.jobs, ...archivedData.jobs]);
+      const combined = [
+        ...(Array.isArray(activeData?.jobs) ? activeData.jobs : []),
+        ...(Array.isArray(archivedData?.jobs) ? archivedData.jobs : []),
+      ];
+      setJobs(combined);
     } catch (err) {
       setFetchError(err.response?.data?.message || "Failed to load jobs.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [recruiterId]);
 
   useEffect(() => {
-    loadJobs();
-  }, [loadJobs]);
+    let isCurrent = true;
+    const params = recruiterId ? { recruiterId } : {};
 
-  // ──────────────────────────────────────────────────────────
-  // Helpers
-  // ──────────────────────────────────────────────────────────
-  const showSnackbar = (message, severity = "success") => {
-    setSnackbarMessage(message);
-    setSnackbarSeverity(severity);
-    setSnackbarOpen(true);
-  };
+    Promise.all([
+      fetchJobs({ ...params, status: "active" }),
+      fetchJobs({ ...params, status: "archived" }),
+    ])
+      .then(([activeData, archivedData]) => {
+        if (isCurrent) {
+          const combined = [
+            ...(Array.isArray(activeData?.jobs) ? activeData.jobs : []),
+            ...(Array.isArray(archivedData?.jobs) ? archivedData.jobs : []),
+          ];
+          setJobs(combined);
+          setLoading(false);
+        }
+      })
+      .catch((err) => {
+        if (isCurrent) {
+          setFetchError(err.response?.data?.message || "Failed to load jobs.");
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [recruiterId]);
 
   // Converts comma-separated skill string into a clean string array for the backend
   const parseSkills = (skillString) =>
@@ -546,20 +575,6 @@ function Jobs() {
           </DialogActions>
         </Box>
       </Dialog>
-
-      {/* Snackbar */}
-      <Snackbar
-        open={snackbarOpen}
-        autoHideDuration={4000}
-        onClose={() => setSnackbarOpen(false)}
-      >
-        <Alert
-          severity={snackbarSeverity}
-          onClose={() => setSnackbarOpen(false)}
-        >
-          {snackbarMessage}
-        </Alert>
-      </Snackbar>
     </Box>
   );
 }

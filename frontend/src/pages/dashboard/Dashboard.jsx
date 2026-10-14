@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-
+import { Link, useNavigate } from "react-router-dom";
 import {
   Box,
   Card,
@@ -8,31 +8,82 @@ import {
   Grid,
   Skeleton,
   Typography,
+  Button,
+  Avatar,
+  Divider,
+  LinearProgress,
 } from "@mui/material";
 
 import WorkIcon from "@mui/icons-material/Work";
 import PeopleIcon from "@mui/icons-material/People";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import TrendingUpIcon from "@mui/icons-material/TrendingUp";
+import AddIcon from "@mui/icons-material/Add";
+import ViewKanbanIcon from "@mui/icons-material/ViewKanban";
+import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
+import EventAvailableIcon from "@mui/icons-material/EventAvailable";
+import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
+import PsychologyIcon from "@mui/icons-material/Psychology";
 
 import { useAuth } from "../../context/useAuth";
 import { fetchJobs } from "../../services/jobService";
 import { fetchApplicationsByJob } from "../../services/applicationService";
 
-function StatCard({ label, value, icon, color = "primary.main", loading }) {
+// Helper for stage colors
+const STAGE_COLORS = {
+  Applied: { main: "#F59E0B", bg: "#FFFBEB", border: "#FDE68A" },
+  Shortlisted: { main: "#6366F1", bg: "#EEF2FF", border: "#C7D2FE" },
+  Interview: { main: "#0EA5E9", bg: "#F0F9FF", border: "#BAE6FD" },
+  Offered: { main: "#10B981", bg: "#ECFDF5", border: "#A7F3D0" },
+  Rejected: { main: "#EF4444", bg: "#FEF2F2", border: "#FECACA" },
+};
+
+function StatCard({ label, value, subtitle, icon, colorGradient, loading }) {
   return (
-    <Card>
-      <CardContent>
-        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+    <Card
+      sx={{
+        position: "relative",
+        overflow: "hidden",
+        border: "1px solid #E2E8F0",
+        borderRadius: "16px",
+        boxShadow: "0 4px 20px -2px rgba(15, 23, 42, 0.04)",
+        transition: "transform 0.2s ease, box-shadow 0.2s ease",
+        "&:hover": {
+          transform: "translateY(-2px)",
+          boxShadow: "0 8px 24px -4px rgba(15, 23, 42, 0.08)",
+        },
+      }}
+    >
+      <CardContent sx={{ p: 2.5 }}>
+        <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
           <Box>
-            <Typography variant="body2" color="text.secondary">
+            <Typography variant="body2" color="text.secondary" fontWeight={600}>
               {label}
             </Typography>
-            <Typography variant="h4" fontWeight={700} sx={{ mt: 1 }}>
-              {loading ? <Skeleton width={60} /> : value ?? "—"}
+            <Typography variant="h4" fontWeight={800} sx={{ mt: 1, letterSpacing: "-0.03em" }}>
+              {loading ? <Skeleton width={60} height={40} /> : value ?? "0"}
             </Typography>
+            {subtitle && (
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5, fontWeight: 500 }}>
+                {subtitle}
+              </Typography>
+            )}
           </Box>
-          <Box sx={{ color }}>{icon}</Box>
+          <Box
+            sx={{
+              width: 48,
+              height: 48,
+              borderRadius: "12px",
+              background: colorGradient,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#FFF",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+            }}
+          >
+            {icon}
+          </Box>
         </Box>
       </CardContent>
     </Card>
@@ -41,172 +92,578 @@ function StatCard({ label, value, icon, color = "primary.main", loading }) {
 
 function Dashboard() {
   const { user } = useAuth();
+  const navigate = useNavigate();
 
-  const [stats, setStats] = useState({
-    totalJobs: null,
-    activeJobs: null,
-    totalApplications: null,
-    shortlisted: null,
-  });
   const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    totalJobs: 0,
+    activeJobs: 0,
+    archivedJobs: 0,
+    totalApplications: 0,
+    shortlisted: 0,
+    interviews: 0,
+    offered: 0,
+    rejected: 0,
+    applied: 0,
+  });
   const [recentJobs, setRecentJobs] = useState([]);
+  const [recentApplications, setRecentApplications] = useState([]);
+  const [topSkills, setTopSkills] = useState([]);
 
   useEffect(() => {
     let cancelled = false;
 
-    const loadStats = async () => {
-      setLoading(true);
+    const loadDashboardData = async () => {
       try {
-        // Fetch active + archived jobs in parallel
+        const recruiterId = user?._id || user?.id;
+        const params = recruiterId ? { recruiterId } : {};
+
+        // 1. Fetch recruiter jobs (active + archived)
         const [activeData, archivedData] = await Promise.all([
-          fetchJobs({ status: "active", limit: 100 }),
-          fetchJobs({ status: "archived", limit: 100 }),
+          fetchJobs({ ...params, status: "active", limit: 100 }),
+          fetchJobs({ ...params, status: "archived", limit: 100 }),
         ]);
 
-        const allJobs = [...activeData.jobs, ...archivedData.jobs];
-        const activeJobs = activeData.jobs;
+        const activeJobs = Array.isArray(activeData?.jobs) ? activeData.jobs : [];
+        const archivedJobs = Array.isArray(archivedData?.jobs) ? archivedData.jobs : [];
+        const allJobs = [...activeJobs, ...archivedJobs];
 
-        // Fetch applications for each active job (in parallel), ignore failures
-        const appResults = await Promise.allSettled(
-          activeJobs.map((job) => fetchApplicationsByJob(job._id))
-        );
-
-        let totalApplications = 0;
-        let shortlisted = 0;
-
-        appResults.forEach((result) => {
-          if (result.status === "fulfilled") {
-            totalApplications += result.value.length;
-            shortlisted += result.value.filter(
-              (app) => app.status === "Shortlisted"
-            ).length;
+        // 2. Compute Top In-Demand Skills across active jobs
+        const skillCounts = {};
+        activeJobs.forEach((j) => {
+          if (Array.isArray(j.requiredSkills)) {
+            j.requiredSkills.forEach((s) => {
+              const trimmed = s.trim();
+              if (trimmed) {
+                skillCounts[trimmed] = (skillCounts[trimmed] || 0) + 1;
+              }
+            });
           }
         });
+        const sortedSkills = Object.entries(skillCounts)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 8);
+
+        // 3. Fetch applications for recruiter's active jobs
+        const appResults = await Promise.allSettled(
+          activeJobs.map((job) =>
+            fetchApplicationsByJob(job._id).then((apps) =>
+              apps.map((app) => ({ ...app, jobTitle: job.title, jobId: job._id }))
+            )
+          )
+        );
+
+        let totalApps = 0;
+        let appliedCount = 0;
+        let shortlistedCount = 0;
+        let interviewCount = 0;
+        let offeredCount = 0;
+        let rejectedCount = 0;
+        const aggregatedApplications = [];
+
+        appResults.forEach((res) => {
+          if (res.status === "fulfilled" && Array.isArray(res.value)) {
+            res.value.forEach((app) => {
+              totalApps++;
+              aggregatedApplications.push(app);
+              if (app.status === "Shortlisted") shortlistedCount++;
+              else if (app.status === "Interview") interviewCount++;
+              else if (app.status === "Offered") offeredCount++;
+              else if (app.status === "Rejected") rejectedCount++;
+              else appliedCount++;
+            });
+          }
+        });
+
+        // Sort applications by createdAt desc
+        aggregatedApplications.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
 
         if (!cancelled) {
           setStats({
             totalJobs: allJobs.length,
             activeJobs: activeJobs.length,
-            totalApplications,
-            shortlisted,
+            archivedJobs: archivedJobs.length,
+            totalApplications: totalApps,
+            applied: appliedCount,
+            shortlisted: shortlistedCount,
+            interviews: interviewCount,
+            offered: offeredCount,
+            rejected: rejectedCount,
           });
-          setRecentJobs(allJobs.slice(0, 5));
+          setRecentJobs(activeJobs.slice(0, 5));
+          setRecentApplications(aggregatedApplications.slice(0, 6));
+          setTopSkills(sortedSkills);
         }
-      } catch {
-        // Non-critical — leave stats as null (shown as —)
+      } catch (err) {
+        console.error("Dashboard metrics load error:", err);
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     };
 
-    loadStats();
-    return () => { cancelled = true; };
-  }, []);
+    loadDashboardData();
 
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
+  // Compute conversion rates
+  const shortlistRate = stats.totalApplications > 0
+    ? ((stats.shortlisted / stats.totalApplications) * 100).toFixed(1)
+    : "0.0";
+  const interviewRate = stats.totalApplications > 0
+    ? (((stats.interviews + stats.offered) / stats.totalApplications) * 100).toFixed(1)
+    : "0.0";
 
   return (
-    <Box>
-      {/* Welcome */}
-      <Typography variant="h4" fontWeight={600}>
-        Dashboard
-      </Typography>
-      <Typography variant="body1" color="text.secondary" sx={{ mt: 1, mb: 4 }}>
-        Welcome back{user?.name ? `, ${user.name}` : ""}! Here's your recruitment overview.
-      </Typography>
+    <Box sx={{ pb: 6 }}>
+      {/* ── Welcome Header & Quick Action Bar ── */}
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: { xs: "column", md: "row" },
+          justifyContent: "space-between",
+          alignItems: { xs: "flex-start", md: "center" },
+          gap: 2,
+          mb: 4,
+        }}
+      >
+        <Box>
+          <Typography variant="h4" fontWeight={800} sx={{ letterSpacing: "-0.03em", color: "#0F172A" }}>
+            Talent Dashboard
+          </Typography>
+          <Typography variant="body1" color="text.secondary" sx={{ mt: 0.5 }}>
+            Welcome back{user?.name ? `, ${user.name}` : ""}! Here is your real-time recruitment intelligence.
+          </Typography>
+        </Box>
 
-      {/* Stats Row */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid xs={12} sm={6} md={3}>
+        {/* Quick Action Buttons */}
+        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5 }}>
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<AddIcon />}
+            onClick={() => navigate("/recruiter/jobs")}
+            sx={{ fontWeight: 700 }}
+          >
+            Post Job
+          </Button>
+
+          <Button
+            variant="outlined"
+            startIcon={<ViewKanbanIcon sx={{ fontSize: 18 }} />}
+            onClick={() => navigate("/kanban")}
+            sx={{ fontWeight: 600 }}
+          >
+            Pipeline Kanban
+          </Button>
+
+          <Button
+            variant="outlined"
+            startIcon={<EmojiEventsIcon sx={{ fontSize: 18 }} />}
+            onClick={() => navigate("/ranking")}
+            sx={{ fontWeight: 600 }}
+          >
+            AI Rankings
+          </Button>
+        </Box>
+      </Box>
+
+      {/* ── Stat Cards Grid (4 Top KPIs) ── */}
+      <Grid container spacing={2.5} sx={{ mb: 4 }}>
+        <Grid item xs={12} sm={6} md={3}>
           <StatCard
-            label="Total Jobs"
-            value={stats.totalJobs}
-            icon={<WorkIcon sx={{ fontSize: 40 }} />}
-            color="primary.main"
-            loading={loading}
-          />
-        </Grid>
-        <Grid xs={12} sm={6} md={3}>
-          <StatCard
-            label="Active Jobs"
+            label="Active Openings"
             value={stats.activeJobs}
-            icon={<CheckCircleIcon sx={{ fontSize: 40 }} />}
-            color="success.main"
+            subtitle={`${stats.archivedJobs} archived postings`}
+            icon={<WorkIcon sx={{ fontSize: 24 }} />}
+            colorGradient="linear-gradient(135deg, #10B981 0%, #059669 100%)"
             loading={loading}
           />
         </Grid>
-        <Grid xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={6} md={3}>
           <StatCard
-            label="Total Applications"
+            label="Total Candidates"
             value={stats.totalApplications}
-            icon={<PeopleIcon sx={{ fontSize: 40 }} />}
-            color="info.main"
+            subtitle={`${shortlistRate}% qualification rate`}
+            icon={<PeopleIcon sx={{ fontSize: 24 }} />}
+            colorGradient="linear-gradient(135deg, #4F46E5 0%, #6366F1 100%)"
             loading={loading}
           />
         </Grid>
-        <Grid xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={6} md={3}>
           <StatCard
             label="Shortlisted"
             value={stats.shortlisted}
-            icon={<TrendingUpIcon sx={{ fontSize: 40 }} />}
-            color="warning.main"
+            subtitle="Ready for recruiter interview"
+            icon={<CheckCircleIcon sx={{ fontSize: 24 }} />}
+            colorGradient="linear-gradient(135deg, #7C3AED 0%, #8B5CF6 100%)"
+            loading={loading}
+          />
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <StatCard
+            label="Active Interviews"
+            value={stats.interviews}
+            subtitle={`${interviewRate}% interview conversion`}
+            icon={<EventAvailableIcon sx={{ fontSize: 24 }} />}
+            colorGradient="linear-gradient(135deg, #0EA5E9 0%, #0284C7 100%)"
             loading={loading}
           />
         </Grid>
       </Grid>
 
-      {/* Recent Jobs */}
-      <Card>
-        <CardContent>
-          <Typography variant="h6" fontWeight={600} sx={{ mb: 2 }}>
-            Recent Job Postings
-          </Typography>
+      {/* ── Middle Section: Pipeline Funnel + Skill Demands ── */}
+      <Grid container spacing={3} sx={{ mb: 4 }}>
+        {/* Left: Pipeline Funnel Card */}
+        <Grid item xs={12} md={8}>
+          <Card sx={{ height: "100%" }}>
+            <CardContent>
+              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
+                <Box>
+                  <Typography variant="h6" fontWeight={700}>
+                    Application Pipeline Funnel
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Candidate stage distribution across all active jobs
+                  </Typography>
+                </Box>
+                <Chip
+                  icon={<TrendingUpIcon sx={{ fontSize: 16 }} />}
+                  label={`Shortlist: ${shortlistRate}%`}
+                  size="small"
+                  sx={{
+                    fontWeight: 700,
+                    backgroundColor: "#EEF2FF",
+                    color: "#4F46E5",
+                  }}
+                />
+              </Box>
 
-          {loading ? (
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-              {[1, 2, 3].map((n) => (
-                <Skeleton key={n} variant="rectangular" height={48} sx={{ borderRadius: 1 }} />
-              ))}
-            </Box>
-          ) : recentJobs.length === 0 ? (
-            <Typography color="text.secondary">
-              No jobs created yet. Head to the Jobs page to post your first role.
-            </Typography>
-          ) : (
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-              {recentJobs.map((job) => (
+              {/* Multi-segment Progress Bar */}
+              <Box sx={{ my: 3 }}>
                 <Box
-                  key={job._id}
                   sx={{
                     display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    p: 2,
-                    borderRadius: 1,
-                    bgcolor: "action.hover",
-                    flexWrap: "wrap",
-                    gap: 1,
+                    height: 12,
+                    borderRadius: 6,
+                    overflow: "hidden",
+                    backgroundColor: "#F1F5F9",
+                    gap: "2px",
                   }}
                 >
-                  <Box>
-                    <Typography fontWeight={600}>{job.title}</Typography>
+                  {stats.totalApplications === 0 ? (
+                    <Box sx={{ width: "100%", bgcolor: "#E2E8F0" }} />
+                  ) : (
+                    <>
+                      <Box
+                        sx={{
+                          width: `${(stats.applied / stats.totalApplications) * 100}%`,
+                          bgcolor: STAGE_COLORS.Applied.main,
+                          transition: "width 0.5s ease",
+                        }}
+                      />
+                      <Box
+                        sx={{
+                          width: `${(stats.shortlisted / stats.totalApplications) * 100}%`,
+                          bgcolor: STAGE_COLORS.Shortlisted.main,
+                          transition: "width 0.5s ease",
+                        }}
+                      />
+                      <Box
+                        sx={{
+                          width: `${(stats.interviews / stats.totalApplications) * 100}%`,
+                          bgcolor: STAGE_COLORS.Interview.main,
+                          transition: "width 0.5s ease",
+                        }}
+                      />
+                      <Box
+                        sx={{
+                          width: `${(stats.offered / stats.totalApplications) * 100}%`,
+                          bgcolor: STAGE_COLORS.Offered.main,
+                          transition: "width 0.5s ease",
+                        }}
+                      />
+                      <Box
+                        sx={{
+                          width: `${(stats.rejected / stats.totalApplications) * 100}%`,
+                          bgcolor: STAGE_COLORS.Rejected.main,
+                          transition: "width 0.5s ease",
+                        }}
+                      />
+                    </>
+                  )}
+                </Box>
+              </Box>
+
+              {/* Stage breakdown detail pills */}
+              <Grid container spacing={2}>
+                {[
+                  { label: "Applied", count: stats.applied, color: STAGE_COLORS.Applied },
+                  { label: "Shortlisted", count: stats.shortlisted, color: STAGE_COLORS.Shortlisted },
+                  { label: "Interview", count: stats.interviews, color: STAGE_COLORS.Interview },
+                  { label: "Offered", count: stats.offered, color: STAGE_COLORS.Offered },
+                  { label: "Rejected", count: stats.rejected, color: STAGE_COLORS.Rejected },
+                ].map((stage) => {
+                  const pct = stats.totalApplications > 0
+                    ? ((stage.count / stats.totalApplications) * 100).toFixed(0)
+                    : 0;
+                  return (
+                    <Grid item xs={6} sm={2.4} key={stage.label}>
+                      <Box
+                        sx={{
+                          p: 1.5,
+                          borderRadius: "12px",
+                          backgroundColor: stage.color.bg,
+                          border: `1px solid ${stage.color.border}`,
+                          textAlign: "center",
+                        }}
+                      >
+                        <Typography variant="caption" sx={{ color: stage.color.main, fontWeight: 700 }}>
+                          {stage.label}
+                        </Typography>
+                        <Typography variant="h6" fontWeight={800} sx={{ color: "#0F172A", mt: 0.5 }}>
+                          {stage.count}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {pct}%
+                        </Typography>
+                      </Box>
+                    </Grid>
+                  );
+                })}
+              </Grid>
+
+              <Divider sx={{ my: 3 }} />
+
+              {/* Recent Active Openings Section */}
+              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
+                <Typography variant="subtitle1" fontWeight={700}>
+                  Active Openings
+                </Typography>
+                <Button
+                  component={Link}
+                  to="/recruiter/jobs"
+                  size="small"
+                  endIcon={<ArrowForwardIcon sx={{ fontSize: 14 }} />}
+                  sx={{ fontSize: "0.8rem", fontWeight: 600 }}
+                >
+                  View All Jobs
+                </Button>
+              </Box>
+
+              {loading ? (
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+                  {[1, 2, 3].map((n) => (
+                    <Skeleton key={n} variant="rounded" height={60} />
+                  ))}
+                </Box>
+              ) : recentJobs.length === 0 ? (
+                <Box sx={{ py: 4, textAlign: "center", bgcolor: "#F8FAFC", borderRadius: 2 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    No active jobs yet. Click "Post Job" above to create your first opening.
+                  </Typography>
+                </Box>
+              ) : (
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+                  {recentJobs.map((job) => (
+                    <Box
+                      key={job._id}
+                      sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        p: 2,
+                        borderRadius: "12px",
+                        border: "1px solid #F1F5F9",
+                        backgroundColor: "#FFFFFF",
+                        transition: "all 0.15s ease",
+                        "&:hover": {
+                          borderColor: "#CBD5E1",
+                          backgroundColor: "#F8FAFC",
+                        },
+                      }}
+                    >
+                      <Box>
+                        <Typography fontWeight={700} sx={{ color: "#0F172A" }}>
+                          {job.title}
+                        </Typography>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 0.5, flexWrap: "wrap" }}>
+                          <Chip
+                            label={job.experienceLevel || "Any Level"}
+                            size="small"
+                            sx={{ fontSize: "0.7rem", height: 20, bgcolor: "#F1F5F9", fontWeight: 600 }}
+                          />
+                          {job.requiredSkills?.slice(0, 3).map((s) => (
+                            <Chip
+                              key={s}
+                              label={s}
+                              size="small"
+                              sx={{ fontSize: "0.7rem", height: 20, bgcolor: "#EEF2FF", color: "#4F46E5", fontWeight: 600 }}
+                            />
+                          ))}
+                        </Box>
+                      </Box>
+
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => navigate("/recruiter/applications")}
+                        sx={{ fontSize: "0.75rem", fontWeight: 600, shrink: 0 }}
+                      >
+                        Candidates →
+                      </Button>
+                    </Box>
+                  ))}
+                </Box>
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Right: Candidate Activity Stream + Skill Cloud */}
+        <Grid item xs={12} md={4}>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 3, height: "100%" }}>
+            {/* Live Candidate Inflow Stream */}
+            <Card sx={{ flex: 1 }}>
+              <CardContent>
+                <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
+                  <Typography variant="h6" fontWeight={700}>
+                    Recent Candidates
+                  </Typography>
+                  <Button
+                    component={Link}
+                    to="/recruiter/applications"
+                    size="small"
+                    sx={{ fontSize: "0.75rem", fontWeight: 600 }}
+                  >
+                    View All
+                  </Button>
+                </Box>
+
+                {loading ? (
+                  <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                    {[1, 2, 3, 4].map((n) => (
+                      <Skeleton key={n} variant="rounded" height={45} />
+                    ))}
+                  </Box>
+                ) : recentApplications.length === 0 ? (
+                  <Box sx={{ py: 6, textAlign: "center", bgcolor: "#F8FAFC", borderRadius: 2 }}>
                     <Typography variant="body2" color="text.secondary">
-                      {job.experienceLevel || "Any level"}
-                      {job.requiredSkills?.length > 0 &&
-                        ` · ${job.requiredSkills.slice(0, 3).join(", ")}`}
+                      No candidate submissions yet.
                     </Typography>
                   </Box>
-                  <Chip
-                    label={job.status === "active" ? "Active" : "Archived"}
-                    color={job.status === "active" ? "success" : "default"}
-                    size="small"
-                  />
+                ) : (
+                  <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+                    {recentApplications.map((app) => {
+                      const candidateName = app.applicantId?.name || "Candidate";
+                      const stageColor = STAGE_COLORS[app.status] || STAGE_COLORS.Applied;
+                      return (
+                        <Box
+                          key={app._id}
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            p: 1.5,
+                            borderRadius: "10px",
+                            bgcolor: "#F8FAFC",
+                            border: "1px solid #F1F5F9",
+                          }}
+                        >
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, minWidth: 0 }}>
+                            <Avatar
+                              sx={{
+                                width: 32,
+                                height: 32,
+                                bgcolor: "#EEF2FF",
+                                color: "#4F46E5",
+                                fontSize: "0.8rem",
+                                fontWeight: 700,
+                              }}
+                            >
+                              {candidateName.charAt(0).toUpperCase()}
+                            </Avatar>
+                            <Box sx={{ minWidth: 0 }}>
+                              <Typography variant="body2" fontWeight={700} noWrap sx={{ color: "#0F172A" }}>
+                                {candidateName}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary" noWrap sx={{ display: "block" }}>
+                                {app.jobTitle}
+                              </Typography>
+                            </Box>
+                          </Box>
+
+                          <Chip
+                            label={app.status}
+                            size="small"
+                            sx={{
+                              bgcolor: stageColor.bg,
+                              color: stageColor.main,
+                              border: `1px solid ${stageColor.border}`,
+                              fontWeight: 700,
+                              fontSize: "0.68rem",
+                              height: 22,
+                              shrink: 0,
+                            }}
+                          />
+                        </Box>
+                      );
+                    })}
+                  </Box>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* In-Demand Skills Cloud */}
+            <Card>
+              <CardContent>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.5 }}>
+                  <PsychologyIcon sx={{ color: "#4F46E5", fontSize: 22 }} />
+                  <Typography variant="h6" fontWeight={700}>
+                    Top In-Demand Skills
+                  </Typography>
                 </Box>
-              ))}
-            </Box>
-          )}
-        </CardContent>
-      </Card>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Most sought skills across your current active positions:
+                </Typography>
+
+                {loading ? (
+                  <Skeleton height={60} />
+                ) : topSkills.length === 0 ? (
+                  <Typography variant="caption" color="text.secondary">
+                    No required skills defined yet.
+                  </Typography>
+                ) : (
+                  <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+                    {topSkills.map(([skill, count]) => (
+                      <Chip
+                        key={skill}
+                        label={`${skill} · ${count}`}
+                        size="small"
+                        sx={{
+                          bgcolor: "#F8FAFC",
+                          border: "1px solid #E2E8F0",
+                          fontWeight: 600,
+                          fontSize: "0.75rem",
+                          "&:hover": {
+                            bgcolor: "#EEF2FF",
+                            borderColor: "#C7D2FE",
+                            color: "#4F46E5",
+                          },
+                        }}
+                      />
+                    ))}
+                  </Box>
+                )}
+              </CardContent>
+            </Card>
+          </Box>
+        </Grid>
+      </Grid>
     </Box>
   );
 }

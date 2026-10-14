@@ -19,13 +19,13 @@ import {
   Paper,
   Select,
   Skeleton,
-  Snackbar,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
   TableRow,
+  TextField,
   Typography,
 } from "@mui/material";
 
@@ -46,6 +46,7 @@ import {
   fetchApplicationAnalysis,
   reanalyzeApplication,
 } from "../../services/applicationService";
+import { useToast } from "../../context/ToastContext";
 
 // Backend status enum (must match Application.js model)
 const PIPELINE_STATUSES = ["Applied", "Shortlisted", "Interview", "Offered", "Rejected"];
@@ -77,63 +78,89 @@ function Applications() {
   const [analysis, setAnalysis] = useState(null);
   const [analysisLoading, setAnalysisLoading] = useState(false);
 
-  // ── Status update ────────────────────────────────────────────
+  // ── Status update & interview scheduling ────────────────────
   const [statusUpdating, setStatusUpdating] = useState(false);
+  const [interviewOpen, setInterviewOpen] = useState(false);
+  const [interviewTargetId, setInterviewTargetId] = useState(null);
+  const [interviewDetails, setInterviewDetails] = useState("");
 
   // ── Resume dialog ────────────────────────────────────────────
   const [resumeOpen, setResumeOpen] = useState(false);
   const [resumeLoading, setResumeLoading] = useState(false);
   const [resumeUrl, setResumeUrl] = useState(null);
+  const [downloadLink, setDownloadLink] = useState(null);
   const [resumeError, setResumeError] = useState("");
   const [resumeCandidate, setResumeCandidate] = useState(null);
 
-  // ── Snackbar ─────────────────────────────────────────────────
-  const [snackbarOpen, setSnackbarOpen] = useState(false);
-  const [snackbarMessage, setSnackbarMessage] = useState("");
-  const [snackbarSeverity, setSnackbarSeverity] = useState("success");
+  // ── Toast & Helpers ──────────────────────────────────────────
+  const { showToast } = useToast();
+
+  const showSnackbar = useCallback((message, severity = "success") => {
+    showToast(message, severity);
+  }, [showToast]);
+
+  const handleJobChange = (e) => {
+    const newId = e.target.value;
+    setSelectedJobId(newId);
+    if (newId === "all") {
+      setApplications([]);
+      setFetchError("");
+      setAppsLoading(false);
+    } else {
+      setAppsLoading(true);
+      setFetchError("");
+    }
+  };
 
   // ── Fetch recruiter's active jobs for the filter ─────────────
   useEffect(() => {
-    setJobsLoading(true);
+    const user = JSON.parse(localStorage.getItem("user") || "{}");
+    const recruiterId = user?._id || user?.id;
+    const params = recruiterId ? { recruiterId } : {};
+
     Promise.all([
-      fetchJobs({ status: "active" }),
-      fetchJobs({ status: "archived" }),
+      fetchJobs({ ...params, status: "active" }),
+      fetchJobs({ ...params, status: "archived" }),
     ])
       .then(([activeData, archivedData]) => {
-        setJobs([...activeData.jobs, ...archivedData.jobs]);
+        const combined = [
+          ...(Array.isArray(activeData?.jobs) ? activeData.jobs : []),
+          ...(Array.isArray(archivedData?.jobs) ? archivedData.jobs : []),
+        ];
+        setJobs(combined);
       })
-      .catch(() => {})
+      .catch((err) => {
+        showSnackbar(err.response?.data?.message || "Failed to load jobs.", "error");
+      })
       .finally(() => setJobsLoading(false));
-  }, []);
+  }, [showSnackbar]);
 
   // ── Fetch applications when job filter changes ───────────────
-  const loadApplications = useCallback(async () => {
+  useEffect(() => {
     if (selectedJobId === "all") {
-      setApplications([]);
       return;
     }
-    setAppsLoading(true);
-    setFetchError("");
-    try {
-      const data = await fetchApplicationsByJob(selectedJobId);
-      setApplications(data);
-    } catch (err) {
-      setFetchError(err.response?.data?.message || "Failed to load applications.");
-    } finally {
-      setAppsLoading(false);
-    }
+
+    let isCurrent = true;
+
+    fetchApplicationsByJob(selectedJobId)
+      .then((data) => {
+        if (isCurrent) {
+          setApplications(Array.isArray(data) ? data : []);
+          setAppsLoading(false);
+        }
+      })
+      .catch((err) => {
+        if (isCurrent) {
+          setFetchError(err.response?.data?.message || "Failed to load applications.");
+          setAppsLoading(false);
+        }
+      });
+
+    return () => {
+      isCurrent = false;
+    };
   }, [selectedJobId]);
-
-  useEffect(() => {
-    loadApplications();
-  }, [loadApplications]);
-
-  // ── Helpers ───────────────────────────────────────────────────
-  const showSnackbar = (message, severity = "success") => {
-    setSnackbarMessage(message);
-    setSnackbarSeverity(severity);
-    setSnackbarOpen(true);
-  };
 
   const formatDate = (isoString) => {
     if (!isoString) return "—";
@@ -164,10 +191,18 @@ function Applications() {
   };
 
   // ── Status update ─────────────────────────────────────────────
-  const handleStatusChange = async (applicationId, newStatus) => {
+  const handleStatusChange = async (applicationId, newStatus, customDetails = null) => {
+    // If moving to Interview and no details have been collected yet, prompt the recruiter
+    if (newStatus === "Interview" && !customDetails) {
+      setInterviewTargetId(applicationId);
+      setInterviewDetails("Date: Tomorrow, 2:00 PM IST\nLink: https://meet.google.com/interview\nNotes: Technical discussion with team.");
+      setInterviewOpen(true);
+      return;
+    }
+
     setStatusUpdating(true);
     try {
-      await updateApplicationStatus(applicationId, newStatus);
+      await updateApplicationStatus(applicationId, newStatus, customDetails);
       // Update local state without a full refetch
       setApplications((prev) =>
         prev.map((app) =>
@@ -199,12 +234,14 @@ function Applications() {
   const handleViewResume = async (application) => {
     setResumeCandidate(application);
     setResumeUrl(null);
+    setDownloadLink(null);
     setResumeError("");
     setResumeLoading(true);
     setResumeOpen(true);
     try {
-      const { downloadUrl } = await fetchResumeDownloadUrl(application._id);
-      setResumeUrl(downloadUrl);
+      const data = await fetchResumeDownloadUrl(application._id);
+      setResumeUrl(data.viewUrl || data.downloadUrl);
+      setDownloadLink(data.downloadUrl);
     } catch (err) {
       setResumeError(err.response?.data?.message || "Could not load resume.");
     } finally {
@@ -216,13 +253,15 @@ function Applications() {
     setResumeOpen(false);
     setResumeCandidate(null);
     setResumeUrl(null);
+    setDownloadLink(null);
     setResumeError("");
   };
 
   const handleDownloadResume = () => {
-    if (!resumeUrl) return;
+    const target = downloadLink || resumeUrl;
+    if (!target) return;
     const link = document.createElement("a");
-    link.href = resumeUrl;
+    link.href = target;
     link.target = "_blank";
     link.rel = "noopener noreferrer";
     link.click();
@@ -309,7 +348,7 @@ function Applications() {
               <Select
                 value={selectedJobId}
                 label="Filter by Job"
-                onChange={(e) => setSelectedJobId(e.target.value)}
+                onChange={handleJobChange}
               >
                 <MenuItem value="all">— Select a Job —</MenuItem>
                 {jobs.map((job) => (
@@ -472,21 +511,63 @@ function Applications() {
                 </Box>
               ) : analysis ? (
                 <Box sx={{ mb: 3, p: 2, bgcolor: "action.hover", borderRadius: 2 }}>
-                  <Typography variant="body2" color="text.secondary">
-                    Match Score
-                  </Typography>
-                  <Typography variant="h4" fontWeight={700} color="primary">
-                    {analysis.matchScore ?? "—"}%
-                  </Typography>
+                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                    <div>
+                      <Typography variant="body2" color="text.secondary">
+                        Match Score
+                      </Typography>
+                      <Typography variant="h4" fontWeight={700} color="primary">
+                        {analysis.score ?? analysis.matchScore ?? "—"}%
+                      </Typography>
+                    </div>
+                    {analysis.experienceYears !== undefined && analysis.experienceYears !== null && (
+                      <Chip
+                        size="small"
+                        label={`${analysis.experienceYears} yrs experience`}
+                        color="info"
+                        variant="outlined"
+                      />
+                    )}
+                  </Box>
+
                   {analysis.summary && (
-                    <Typography variant="body2" sx={{ mt: 1 }}>
+                    <Typography variant="body2" sx={{ mt: 1.5, color: "text.primary" }}>
                       {analysis.summary}
                     </Typography>
                   )}
+
+                  {/* Matched Skills */}
+                  {Array.isArray(analysis.matchedSkills) && analysis.matchedSkills.length > 0 && (
+                    <Box sx={{ mt: 2 }}>
+                      <Typography variant="caption" fontWeight={600} color="success.main" display="block" sx={{ mb: 0.5 }}>
+                        MATCHED SKILLS
+                      </Typography>
+                      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+                        {analysis.matchedSkills.map((s) => (
+                          <Chip key={s} label={s} size="small" color="success" variant="outlined" />
+                        ))}
+                      </Box>
+                    </Box>
+                  )}
+
+                  {/* Missing Skills */}
+                  {Array.isArray(analysis.missingSkills) && analysis.missingSkills.length > 0 && (
+                    <Box sx={{ mt: 1.5 }}>
+                      <Typography variant="caption" fontWeight={600} color="warning.main" display="block" sx={{ mb: 0.5 }}>
+                        MISSING SKILLS
+                      </Typography>
+                      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+                        {analysis.missingSkills.map((s) => (
+                          <Chip key={s} label={s} size="small" color="warning" variant="outlined" />
+                        ))}
+                      </Box>
+                    </Box>
+                  )}
+
                   <Button
                     size="small"
                     startIcon={<RefreshIcon />}
-                    sx={{ mt: 1 }}
+                    sx={{ mt: 2 }}
                     onClick={() => handleReanalyze(selectedApplication._id)}
                   >
                     Re-analyze
@@ -658,21 +739,62 @@ function Applications() {
         </DialogActions>
       </Dialog>
 
-      {/* Snackbar */}
-      <Snackbar
-        open={snackbarOpen}
-        autoHideDuration={4000}
-        onClose={() => setSnackbarOpen(false)}
-        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+      {/* Interview Scheduling Dialog */}
+      <Dialog
+        open={interviewOpen}
+        onClose={() => {
+          setInterviewOpen(false);
+          setInterviewTargetId(null);
+          setInterviewDetails("");
+        }}
+        maxWidth="sm"
+        fullWidth
       >
-        <Alert
-          severity={snackbarSeverity}
-          variant="filled"
-          onClose={() => setSnackbarOpen(false)}
-        >
-          {snackbarMessage}
-        </Alert>
-      </Snackbar>
+        <DialogTitle sx={{ fontWeight: 700 }}>
+          Schedule Interview Invitation
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Provide interview date, time, meeting link, or instructions. An automated email invitation will be dispatched to the candidate.
+          </Typography>
+          <TextField
+            autoFocus
+            multiline
+            rows={4}
+            fullWidth
+            label="Interview Details & Agenda"
+            value={interviewDetails}
+            onChange={(e) => setInterviewDetails(e.target.value)}
+            placeholder="Date: Tomorrow, 2:00 PM IST&#10;Platform: Google Meet&#10;Link: https://meet.google.com/xyz-abcd-efg"
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => {
+              setInterviewOpen(false);
+              setInterviewTargetId(null);
+              setInterviewDetails("");
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            color="info"
+            disabled={statusUpdating}
+            onClick={async () => {
+              const targetId = interviewTargetId;
+              const details = interviewDetails;
+              setInterviewOpen(false);
+              setInterviewTargetId(null);
+              setInterviewDetails("");
+              await handleStatusChange(targetId, "Interview", details);
+            }}
+          >
+            {statusUpdating ? "Sending..." : "Confirm & Send Invite"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 }

@@ -38,23 +38,27 @@ const uploadToCloudinary = (file) => {
 /**
  * Generates an expiring download/view URL for candidate resumes
  * @param {string} publicId - Cloudinary Public ID stored in MongoDB
+ * @param {boolean} [inline=false] - If true, omits attachment flag to allow iframe preview
  * @returns {string} - Signed Cloudinary URL
  */
-const getPresignedDownloadUrl = (publicId) => {
+const getPresignedDownloadUrl = (publicId, inline = false) => {
   // Detect if raw document (.docx, .doc) or image/pdf
   const isRaw = /\.docx?$|\.doc$/i.test(publicId);
   const resourceType = isRaw ? 'raw' : 'image';
 
-  // Generate a signed URL that expires in 15 minutes (900 seconds)
-  const downloadUrl = cloudinary.url(publicId, {
+  const options = {
     resource_type: resourceType,
-    flags: 'attachment',
     sign_url: true,
     expires_at: Math.floor(Date.now() / 1000) + 900,
     secure: true,
-  });
+  };
 
-  return downloadUrl;
+  // Only force attachment header if download is desired, otherwise allow inline iframe render
+  if (!inline) {
+    options.flags = 'attachment';
+  }
+
+  return cloudinary.url(publicId, options);
 };
 
 module.exports = {

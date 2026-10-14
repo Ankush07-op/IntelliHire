@@ -30,14 +30,19 @@ const createJob = async (req, res) => {
 // @access  Public
 const getJobs = async (req, res) => {
   try {
-    const { search, status, page = 1, limit = 10 } = req.query;
+    const { search, status, page = 1, limit = 10, recruiterId } = req.query;
 
     let query = {};
+
+    // Filter by recruiter if specified
+    if (recruiterId) {
+      query.recruiterId = recruiterId;
+    }
 
     // Filter by status (default to active for public listing)
     if (status) {
       query.status = status;
-    } else {
+    } else if (!recruiterId) {
       query.status = 'active'; 
     }
 

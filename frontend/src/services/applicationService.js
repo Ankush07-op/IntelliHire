@@ -45,3 +45,12 @@ export const fetchApplicationAnalysis = (id) =>
  */
 export const reanalyzeApplication = (id) =>
   api.post(`/applications/${id}/reanalyze`).then((res) => res.data);
+
+/**
+ * Fetch candidates ranked by AI match score & experience for a job.
+ * @param {string} jobId - MongoDB job _id
+ * @param {object} [params] - Query params: { minScore, maxScore, minExperience, skill }
+ * Response: { count, jobTitle, rankings }
+ */
+export const fetchJobRankings = (jobId, params = {}) =>
+  api.get(`/rankings/job/${jobId}`, { params }).then((res) => res.data);

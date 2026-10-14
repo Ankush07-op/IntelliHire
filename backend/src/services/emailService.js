@@ -64,6 +64,11 @@ const getTemplateByStatus = (applicantName, jobTitle, status) => {
 };
 
 const sendStatusUpdateEmail = async (applicantEmail, applicantName, jobTitle, newStatus) => {
+  if (!process.env.SMTP_USER || !process.env.SMTP_HOST) {
+    console.log(`[Email Skipped] SMTP credentials not configured. Status update email for ${applicantEmail} omitted.`);
+    return;
+  }
+
   const mailOptions = {
     from: `"IntelliHire Recruitment" <${process.env.SMTP_USER}>`,
     to: applicantEmail,
@@ -80,6 +85,15 @@ const sendStatusUpdateEmail = async (applicantEmail, applicantName, jobTitle, ne
 };
 
 const sendInterviewInviteEmail = async (applicantEmail, applicantName, jobTitle, interviewDetails) => {
+  if (!process.env.SMTP_USER || !process.env.SMTP_HOST) {
+    console.log(`[Email Skipped] SMTP credentials not configured. Interview invite for ${applicantEmail} omitted.`);
+    return;
+  }
+
+  const formattedDetails = typeof interviewDetails === 'string'
+    ? interviewDetails.replace(/\n/g, '<br/>')
+    : JSON.stringify(interviewDetails);
+
   const mailOptions = {
     from: `"IntelliHire Recruitment" <${process.env.SMTP_USER}>`,
     to: applicantEmail,
@@ -90,7 +104,7 @@ const sendInterviewInviteEmail = async (applicantEmail, applicantName, jobTitle,
         <p>Hi <strong>${applicantName}</strong>,</p>
         <p>We were very impressed with your background and would like to invite you for an interview for the <strong>${jobTitle}</strong> role.</p>
         <blockquote style="background: #f4f4f4; padding: 15px; border-left: 4px solid #1976d2; margin: 20px 0;">
-          ${interviewDetails.replace(/\n/g, '<br/>')}
+          ${formattedDetails}
         </blockquote>
         <p>Please reply directly to this email to confirm your availability.</p>
         <br/>
@@ -99,7 +113,12 @@ const sendInterviewInviteEmail = async (applicantEmail, applicantName, jobTitle,
     `,
   };
 
-  await transporter.sendMail(mailOptions);
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log(`[Email Sent] Interview invitation sent to ${applicantEmail}`);
+  } catch (error) {
+    console.error(`[Email Failed] Could not send interview invite to ${applicantEmail}:`, error.message);
+  }
 };
 
 module.exports = { sendStatusUpdateEmail, sendInterviewInviteEmail };
