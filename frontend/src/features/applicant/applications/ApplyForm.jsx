@@ -4,10 +4,12 @@ import { applyToJob } from "./applicationsApi";
 import { getProfile } from "../profile/profileApi";
 import ResumeUploader from "./ResumeUploader";
 import { useAuth } from "../auth/AuthContext";
+import { useToast } from "../../../context/ToastContext";
 
 // Props: job (the full job object from JobDetailPage/ApplyPage)
 export default function ApplyForm({ job }) {
     const { user } = useAuth();
+    const { showSuccess, showError } = useToast();
     const navigate = useNavigate();
 
     const [form, setForm] = useState({
@@ -61,8 +63,10 @@ export default function ApplyForm({ job }) {
         try {
             await applyToJob(job.id, job, { ...form, resume });
             setSuccess(true);
+            showSuccess(`Application for ${job.title} submitted successfully!`);
         } catch (err) {
             setFormError(err.message);
+            showError(err.message || "Failed to submit application.");
         } finally {
             setSubmitting(false);
         }

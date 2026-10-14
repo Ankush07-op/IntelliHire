@@ -6,6 +6,8 @@ import {
   ListItemIcon,
   ListItemText,
   Box,
+  Divider,
+  Typography,
 } from "@mui/material";
 
 import DashboardIcon from "@mui/icons-material/Dashboard";
@@ -16,90 +18,194 @@ import BarChartIcon from "@mui/icons-material/BarChart";
 import LogoutIcon from "@mui/icons-material/Logout";
 
 import { useAuth } from "../../context/useAuth";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 
 const drawerWidth = 240;
 
-function Sidebar() {
+function Sidebar({ mobileOpen = false, onMobileClose }) {
   const { logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const menuItems = [
     {
       text: "Dashboard",
-      icon: <DashboardIcon />,
+      icon: <DashboardIcon sx={{ fontSize: 20 }} />,
       path: "/dashboard",
     },
     {
       text: "Jobs",
-      icon: <WorkIcon />,
+      icon: <WorkIcon sx={{ fontSize: 20 }} />,
       path: "/recruiter/jobs",
     },
     {
       text: "Applications",
-      icon: <PeopleIcon />,
+      icon: <PeopleIcon sx={{ fontSize: 20 }} />,
       path: "/recruiter/applications",
     },
     {
-      text: "Kanban",
-      icon: <ViewKanbanIcon />,
+      text: "Kanban Board",
+      icon: <ViewKanbanIcon sx={{ fontSize: 20 }} />,
       path: "/kanban",
     },
     {
-      text: "Ranking",
-      icon: <BarChartIcon />,
+      text: "Candidate Rankings",
+      icon: <BarChartIcon sx={{ fontSize: 20 }} />,
       path: "/ranking",
     },
   ];
 
   const handleLogout = () => {
+    if (onMobileClose) onMobileClose();
     logout();
     navigate("/recruiter/login", { replace: true });
   };
 
-  return (
-    <Drawer
-      variant="permanent"
-      sx={{
-        width: drawerWidth,
-        flexShrink: 0,
-        "& .MuiDrawer-paper": {
-          width: drawerWidth,
-          boxSizing: "border-box",
-          top: "64px",
-        },
-      }}
-    >
-      <Box>
-        <List>
-          {menuItems.map((item) => (
-            <ListItem key={item.text} disablePadding>
+  const drawerContent = (
+    <Box sx={{ display: "flex", flexDirection: "column", height: { xs: "100%", md: "calc(100vh - 64px)" }, p: 1.5 }}>
+      {/* Brand Header visible in Mobile Drawer */}
+      <Box sx={{ display: { xs: "flex", md: "none" }, alignItems: "center", gap: 1.5, px: 1, py: 1.5, mb: 1, borderBottom: "1px solid #F1F5F9" }}>
+        <Box
+          sx={{
+            width: 32,
+            height: 32,
+            borderRadius: "8px",
+            background: "linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "#FFF",
+            fontWeight: 800,
+            fontSize: "1rem",
+          }}
+        >
+          I
+        </Box>
+        <Typography variant="subtitle1" fontWeight={800} sx={{ color: "#0F172A", letterSpacing: "-0.01em" }}>
+          IntelliHire
+        </Typography>
+      </Box>
+
+      <List sx={{ flex: 1, py: 1 }}>
+        {menuItems.map((item) => {
+          const isActive = location.pathname === item.path;
+          return (
+            <ListItem key={item.text} disablePadding sx={{ mb: 0.8 }}>
               <ListItemButton
                 component={Link}
                 to={item.path}
+                onClick={onMobileClose}
+                sx={{
+                  borderRadius: "10px",
+                  py: 1,
+                  px: 1.5,
+                  backgroundColor: isActive ? "#EEF2FF" : "transparent",
+                  color: isActive ? "#4F46E5" : "#475569",
+                  fontWeight: isActive ? 700 : 500,
+                  transition: "all 0.15s ease",
+                  "&:hover": {
+                    backgroundColor: isActive ? "#E0E7FF" : "#F8FAFC",
+                    color: isActive ? "#4338CA" : "#0F172A",
+                  },
+                }}
               >
-                <ListItemIcon>
+                <ListItemIcon
+                  sx={{
+                    minWidth: 36,
+                    color: isActive ? "#4F46E5" : "#64748B",
+                  }}
+                >
                   {item.icon}
                 </ListItemIcon>
 
-                <ListItemText primary={item.text} />
+                <ListItemText
+                  primary={item.text}
+                  primaryTypographyProps={{
+                    fontSize: "0.875rem",
+                    fontWeight: isActive ? 700 : 500,
+                  }}
+                />
               </ListItemButton>
             </ListItem>
-          ))}
+          );
+        })}
+      </List>
 
-          {/* Logout */}
-          <ListItem disablePadding>
-            <ListItemButton onClick={handleLogout}>
-              <ListItemIcon>
-                <LogoutIcon />
-              </ListItemIcon>
+      <Divider sx={{ my: 1, borderColor: "#F1F5F9" }} />
 
-              <ListItemText primary="Logout" />
-            </ListItemButton>
-          </ListItem>
-        </List>
-      </Box>
-    </Drawer>
+      {/* Logout */}
+      <ListItem disablePadding sx={{ pb: 1 }}>
+        <ListItemButton
+          onClick={handleLogout}
+          sx={{
+            borderRadius: "10px",
+            py: 1,
+            px: 1.5,
+            color: "#EF4444",
+            transition: "all 0.15s ease",
+            "&:hover": {
+              backgroundColor: "#FEF2F2",
+            },
+          }}
+        >
+          <ListItemIcon sx={{ minWidth: 36, color: "#EF4444" }}>
+            <LogoutIcon sx={{ fontSize: 20 }} />
+          </ListItemIcon>
+
+          <ListItemText
+            primary="Sign out"
+            primaryTypographyProps={{
+              fontSize: "0.875rem",
+              fontWeight: 600,
+            }}
+          />
+        </ListItemButton>
+      </ListItem>
+    </Box>
+  );
+
+  return (
+    <Box component="nav" sx={{ width: { md: drawerWidth }, flexShrink: { md: 0 } }}>
+      {/* Mobile Drawer (Temporary) */}
+      <Drawer
+        variant="temporary"
+        open={mobileOpen}
+        onClose={onMobileClose}
+        ModalProps={{
+          keepMounted: true, // Improves performance on mobile devices
+        }}
+        sx={{
+          display: { xs: "block", md: "none" },
+          "& .MuiDrawer-paper": {
+            width: drawerWidth,
+            boxSizing: "border-box",
+            backgroundColor: "#FFFFFF",
+          },
+        }}
+      >
+        {drawerContent}
+      </Drawer>
+
+      {/* Desktop Drawer (Permanent) */}
+      <Drawer
+        variant="permanent"
+        sx={{
+          display: { xs: "none", md: "block" },
+          width: drawerWidth,
+          flexShrink: 0,
+          "& .MuiDrawer-paper": {
+            width: drawerWidth,
+            boxSizing: "border-box",
+            top: "64px",
+            borderRight: "1px solid #E2E8F0",
+            backgroundColor: "#FFFFFF",
+          },
+        }}
+        open
+      >
+        {drawerContent}
+      </Drawer>
+    </Box>
   );
 }
 

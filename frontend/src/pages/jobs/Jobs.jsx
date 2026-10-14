@@ -16,10 +16,11 @@ import {
   MenuItem,
   Select,
   Skeleton,
-  Snackbar,
   TextField,
   Typography,
 } from "@mui/material";
+
+import { useToast } from "../../context/ToastContext";
 
 import AddIcon from "@mui/icons-material/Add";
 import WorkIcon from "@mui/icons-material/Work";
@@ -50,11 +51,9 @@ const EMPTY_FORM = {
 function Jobs() {
   const { user } = useAuth();
   const recruiterId = user?._id || user?.id;
+  const { showToast } = useToast();
 
   const [openDialog, setOpenDialog] = useState(false);
-  const [snackbarOpen, setSnackbarOpen] = useState(false);
-  const [snackbarMessage, setSnackbarMessage] = useState("");
-  const [snackbarSeverity, setSnackbarSeverity] = useState("success");
 
   // Jobs from backend
   const [jobs, setJobs] = useState([]);
@@ -68,10 +67,8 @@ function Jobs() {
 
   // ── Helpers ───────────────────────────────────────────────────
   const showSnackbar = useCallback((message, severity = "success") => {
-    setSnackbarMessage(message);
-    setSnackbarSeverity(severity);
-    setSnackbarOpen(true);
-  }, []);
+    showToast(message, severity);
+  }, [showToast]);
 
   // ──────────────────────────────────────────────────────────
   // Fetch recruiter's jobs (scoped by recruiterId)
@@ -578,20 +575,6 @@ function Jobs() {
           </DialogActions>
         </Box>
       </Dialog>
-
-      {/* Snackbar */}
-      <Snackbar
-        open={snackbarOpen}
-        autoHideDuration={4000}
-        onClose={() => setSnackbarOpen(false)}
-      >
-        <Alert
-          severity={snackbarSeverity}
-          onClose={() => setSnackbarOpen(false)}
-        >
-          {snackbarMessage}
-        </Alert>
-      </Snackbar>
     </Box>
   );
 }

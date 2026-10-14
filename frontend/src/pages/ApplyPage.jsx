@@ -54,29 +54,29 @@ export default function ApplyPage() {
 
   if (existingApp) {
     return (
-      <div className="max-w-xl mx-auto bg-white border border-slate-200 rounded-xl p-8 text-center">
-        <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 text-xl font-bold">
+      <div className="max-w-xl mx-auto bg-white border border-slate-200/90 rounded-2xl p-8 text-center shadow-xs">
+        <div className="w-14 h-14 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 text-2xl font-bold border border-indigo-100/80">
           ✓
         </div>
-        <h2 className="text-xl font-bold text-slate-900">Application Already Submitted</h2>
-        <p className="text-sm text-slate-500 mt-2">
-          You already submitted an application for <span className="font-semibold">{job.title}</span> on{" "}
+        <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Application Already Submitted</h2>
+        <p className="text-sm text-slate-500 mt-2 leading-relaxed">
+          You already submitted an application for <span className="font-bold text-slate-700">{job.title}</span> on{" "}
           {formatDate(existingApp.appliedAt)}.
         </p>
-        <div className="mt-4 inline-flex items-center gap-2">
-          <span className="text-xs text-slate-500">Current status:</span>
+        <div className="mt-4 inline-flex items-center gap-2 bg-slate-50 border border-slate-200/60 px-3 py-1.5 rounded-xl">
+          <span className="text-xs font-semibold text-slate-500">Current status:</span>
           <StatusBadge status={existingApp.status} />
         </div>
         <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
           <Link
             to={`/applications/${existingApp.id}`}
-            className="bg-blue-600 text-white font-semibold rounded-lg px-5 py-2.5 hover:bg-blue-700 text-sm"
+            className="bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-bold rounded-xl px-5 py-2.5 hover:from-indigo-700 hover:to-violet-700 text-sm shadow-xs transition-all"
           >
-            View My Application
+            View My Application &rarr;
           </Link>
           <Link
             to="/jobs"
-            className="border border-slate-300 text-slate-700 font-semibold rounded-lg px-5 py-2.5 hover:bg-slate-50 text-sm"
+            className="border border-slate-300 text-slate-700 font-bold rounded-xl px-5 py-2.5 hover:bg-slate-50 text-sm transition-colors"
           >
             Browse Other Jobs
           </Link>

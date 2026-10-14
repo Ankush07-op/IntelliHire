@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 
 import {
   Alert,
+  Avatar,
   Box,
   Button,
   Card,
@@ -14,35 +15,42 @@ import {
   DialogTitle,
   FormControl,
   Grid,
+  InputAdornment,
   MenuItem,
+  OutlinedInput,
   Select,
   Skeleton,
-  Snackbar,
   TextField,
   Typography,
 } from "@mui/material";
 
-import WorkIcon from "@mui/icons-material/Work";
+import { useToast } from "../../context/ToastContext";
+
+import SearchIcon from "@mui/icons-material/Search";
 import PersonIcon from "@mui/icons-material/Person";
 import EmailIcon from "@mui/icons-material/Email";
+import EventAvailableIcon from "@mui/icons-material/EventAvailable";
 
+import { useAuth } from "../../context/useAuth";
 import { fetchJobs } from "../../services/jobService";
 import {
   fetchApplicationsByJob,
   updateApplicationStatus,
 } from "../../services/applicationService";
+import { formatDate } from "../../utils/formatDate";
 
 // Pipeline columns — must match backend enum exactly
 const COLUMNS = [
-  { id: "Applied",     title: "Applied",     color: "warning" },
-  { id: "Shortlisted", title: "Shortlisted", color: "success" },
-  { id: "Interview",   title: "Interview",   color: "info"    },
-  { id: "Offered",     title: "Offered",     color: "primary" },
-  { id: "Rejected",    title: "Rejected",    color: "error"   },
+  { id: "Applied",     title: "Applied",     color: "warning", hex: "#F59E0B", bg: "#FFFBEB" },
+  { id: "Shortlisted", title: "Shortlisted", color: "secondary", hex: "#6366F1", bg: "#EEF2FF" },
+  { id: "Interview",   title: "Interview",   color: "info",    hex: "#0EA5E9", bg: "#F0F9FF" },
+  { id: "Offered",     title: "Offered",     color: "success", hex: "#10B981", bg: "#ECFDF5" },
+  { id: "Rejected",    title: "Rejected",    color: "error",   hex: "#EF4444", bg: "#FEF2F2" },
 ];
 
-
 function Kanban() {
+  const { user } = useAuth();
+
   const [jobs, setJobs] = useState([]);
   const [selectedJobId, setSelectedJobId] = useState("all");
   const [jobsLoading, setJobsLoading] = useState(true);
@@ -50,11 +58,10 @@ function Kanban() {
   const [applications, setApplications] = useState([]);
   const [appsLoading, setAppsLoading] = useState(false);
   const [fetchError, setFetchError] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
 
   const [movingId, setMovingId] = useState(null);
-  const [snackbarOpen, setSnackbarOpen] = useState(false);
-  const [snackbarMessage, setSnackbarMessage] = useState("");
-  const [snackbarSeverity, setSnackbarSeverity] = useState("success");
+  const { showSuccess, showError } = useToast();
 
   // Interview dialog state
   const [interviewOpen, setInterviewOpen] = useState(false);
@@ -63,45 +70,61 @@ function Kanban() {
 
   // ── Load recruiter's jobs for the selector ─────────────────
   useEffect(() => {
-    const loadJobs = async () => {
-      setJobsLoading(true);
-      try {
-        const [active, archived] = await Promise.all([
-          fetchJobs({ status: "active" }),
-          fetchJobs({ status: "archived" }),
-        ]);
-        setJobs([...active.jobs, ...archived.jobs]);
-      } catch {
-        // ignore
-      } finally {
-        setJobsLoading(false);
-      }
+    let active = true;
+    const recruiterId = user?._id || user?.id;
+    const params = recruiterId ? { recruiterId } : {};
+
+    Promise.all([
+      fetchJobs({ ...params, status: "active" }),
+      fetchJobs({ ...params, status: "archived" }),
+    ])
+      .then(([activeData, archivedData]) => {
+        if (active) {
+          const combined = [
+            ...(Array.isArray(activeData?.jobs) ? activeData.jobs : []),
+            ...(Array.isArray(archivedData?.jobs) ? archivedData.jobs : []),
+          ];
+          setJobs(combined);
+          setJobsLoading(false);
+        }
+      })
+      .catch(() => {
+        if (active) setJobsLoading(false);
+      });
+
+    return () => {
+      active = false;
     };
-    loadJobs();
-  }, []);
+  }, [user]);
 
   // ── Load applications when job is selected ─────────────────
   useEffect(() => {
     if (selectedJobId === "all") {
+      setApplications([]);
       return;
     }
+
     let cancelled = false;
-    const loadApplications = async () => {
-      setApplications([]);
-      setAppsLoading(true);
-      setFetchError("");
-      try {
-        const data = await fetchApplicationsByJob(selectedJobId);
-        if (!cancelled) setApplications(data);
-      } catch (err) {
-        if (!cancelled)
-          setFetchError(err.response?.data?.message || "Failed to load applications.");
-      } finally {
-        if (!cancelled) setAppsLoading(false);
-      }
+    setAppsLoading(true);
+    setFetchError("");
+
+    fetchApplicationsByJob(selectedJobId)
+      .then((data) => {
+        if (!cancelled) {
+          setApplications(Array.isArray(data) ? data : []);
+          setAppsLoading(false);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setFetchError(err.response?.data?.message || "Failed to load candidates.");
+          setAppsLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
     };
-    loadApplications();
-    return () => { cancelled = true; };
   }, [selectedJobId]);
 
   // ── Move card to a new status column ──────────────────────
@@ -121,62 +144,84 @@ function Kanban() {
           app._id === applicationId ? { ...app, status: newStatus } : app
         )
       );
-      setSnackbarMessage(`Moved to "${newStatus}" successfully.`);
-      setSnackbarSeverity("success");
-      setSnackbarOpen(true);
+      showSuccess(`Moved to "${newStatus}" successfully.`);
     } catch (err) {
-      setSnackbarMessage(err.response?.data?.message || "Failed to update status.");
-      setSnackbarSeverity("error");
-      setSnackbarOpen(true);
+      showError(err.response?.data?.message || "Failed to update status.");
     } finally {
       setMovingId(null);
     }
   };
 
-  const getColumnCount = (status) =>
-    applications.filter((a) => a.status === status).length;
+  // Filter candidates by live search query
+  const filteredApplications = useMemo(() => {
+    if (!searchQuery.trim()) return applications;
+    const q = searchQuery.toLowerCase();
+    return applications.filter((app) => {
+      const name = app.applicantId?.name?.toLowerCase() || "";
+      const email = app.applicantId?.email?.toLowerCase() || "";
+      return name.includes(q) || email.includes(q);
+    });
+  }, [applications, searchQuery]);
 
-  const candidateName  = (app) => app.applicantId?.name  || "Unknown";
+  const candidateName = (app) => app.applicantId?.name || "Unknown Candidate";
   const candidateEmail = (app) => app.applicantId?.email || "—";
+  const selectedJob = jobs.find((j) => j._id === selectedJobId);
 
   return (
-    <Box>
+    <Box sx={{ pb: 6 }}>
       {/* Page Header */}
       <Box
         sx={{
           display: "flex",
           justifyContent: "space-between",
-          alignItems: "flex-start",
-          mb: 4,
+          alignItems: { xs: "flex-start", md: "center" },
+          mb: 3,
           flexWrap: "wrap",
           gap: 2,
         }}
       >
         <Box>
-          <Typography variant="h4" fontWeight={700} gutterBottom>
+          <Typography variant="h4" fontWeight={800} sx={{ letterSpacing: "-0.03em" }}>
             Recruitment Kanban
           </Typography>
           <Typography variant="body1" color="text.secondary">
-            Track candidates through the recruitment pipeline
+            Visualize and transition candidates across your hiring pipeline stages.
           </Typography>
         </Box>
 
-        {/* Job Selector */}
-        <FormControl size="small" sx={{ minWidth: 260 }} disabled={jobsLoading}>
-          <Select
-            value={selectedJobId}
-            onChange={(e) => setSelectedJobId(e.target.value)}
-            displayEmpty
-          >
-            <MenuItem value="all">— Select a Job to View —</MenuItem>
-            {jobs.map((job) => (
-              <MenuItem key={job._id} value={job._id}>
-                {job.title}
-                {job.status === "archived" && " (Archived)"}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+        {/* Filter Controls: Job Selector + Search */}
+        <Box sx={{ display: "flex", gap: 1.5, alignItems: "center", flexWrap: "wrap" }}>
+          <OutlinedInput
+            size="small"
+            placeholder="Search candidates..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            disabled={selectedJobId === "all"}
+            startAdornment={
+              <InputAdornment position="start">
+                <SearchIcon sx={{ color: "text.secondary", fontSize: 18 }} />
+              </InputAdornment>
+            }
+            sx={{ minWidth: 200, backgroundColor: "#FFF" }}
+          />
+
+          <FormControl size="small" sx={{ minWidth: 240 }} disabled={jobsLoading}>
+            <Select
+              value={selectedJobId}
+              onChange={(e) => setSelectedJobId(e.target.value)}
+              displayEmpty
+              sx={{ backgroundColor: "#FFF" }}
+            >
+              <MenuItem value="all">— Select an Opening to View —</MenuItem>
+              {jobs.map((job) => (
+                <MenuItem key={job._id} value={job._id}>
+                  {job.title}
+                  {job.status === "archived" && " (Archived)"}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Box>
       </Box>
 
       {fetchError && (
@@ -187,143 +232,169 @@ function Kanban() {
 
       {/* Prompt when no job selected */}
       {selectedJobId === "all" && !jobsLoading && (
-        <Box sx={{ py: 10, textAlign: "center" }}>
-          <Typography color="text.secondary">
-            Select a job above to view its candidates on the Kanban board.
+        <Box
+          sx={{
+            py: 12,
+            textAlign: "center",
+            backgroundColor: "#FFFFFF",
+            borderRadius: "16px",
+            border: "1px dashed #CBD5E1",
+          }}
+        >
+          <Typography variant="h6" fontWeight={700} color="text.primary">
+            No Job Opening Selected
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+            Choose a job from the selector above to manage its candidate workflow.
           </Typography>
         </Box>
       )}
 
-      {/* Kanban Board */}
+      {/* Kanban Board Columns */}
       {selectedJobId !== "all" && (
         <Grid container spacing={2}>
           {COLUMNS.map((column) => {
-            const columnCards = applications.filter(
-              (app) => app.status === column.id
-            );
+            const columnCards = filteredApplications.filter((app) => app.status === column.id);
 
             return (
-              <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2 }} key={column.id}>
+              <Grid item xs={12} sm={6} md={2.4} key={column.id}>
                 <Box
                   sx={{
-                    backgroundColor: "action.hover",
-                    borderRadius: 2,
-                    minHeight: 480,
+                    backgroundColor: "#F8FAFC",
+                    border: "1px solid #E2E8F0",
+                    borderTop: `4px solid ${column.hex}`,
+                    borderRadius: "16px",
+                    minHeight: 560,
                     p: 2,
+                    display: "flex",
+                    flexDirection: "column",
                   }}
                 >
                   {/* Column Header */}
-                  <Box
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      mb: 2,
-                    }}
-                  >
-                    <Typography variant="h6" fontWeight={600}>
+                  <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 }}>
+                    <Typography variant="subtitle1" fontWeight={700} sx={{ color: "#0F172A" }}>
                       {column.title}
                     </Typography>
                     <Chip
-                      label={
-                        appsLoading ? "…" : getColumnCount(column.id)
-                      }
+                      label={appsLoading ? "…" : columnCards.length}
                       size="small"
-                      color={column.color}
+                      sx={{
+                        backgroundColor: column.bg,
+                        color: column.hex,
+                        fontWeight: 700,
+                        fontSize: "0.75rem",
+                        height: 22,
+                      }}
                     />
                   </Box>
 
-                  {/* Cards */}
-                  <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                  {/* Cards Container */}
+                  <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5, flex: 1 }}>
                     {appsLoading
                       ? [1, 2].map((n) => (
-                          <Card key={n} elevation={1}>
-                            <CardContent>
-                              <Skeleton variant="text" width="70%" />
-                              <Skeleton variant="text" width="90%" />
-                            </CardContent>
+                          <Card key={n} sx={{ p: 2, borderRadius: "12px" }}>
+                            <Skeleton variant="text" width="60%" />
+                            <Skeleton variant="text" width="90%" />
                           </Card>
                         ))
-                      : columnCards.map((app) => (
-                          <Card
-                            key={app._id}
-                            elevation={1}
-                            sx={{
-                              borderRadius: 2,
-                              opacity: movingId === app._id ? 0.5 : 1,
-                              transition: "opacity 0.2s",
-                              "&:hover": { boxShadow: 4 },
-                            }}
-                          >
-                            <CardContent>
-                              {/* Name */}
-                              <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
-                                <PersonIcon fontSize="small" color="action" />
-                                <Typography fontWeight={600}>
-                                  {candidateName(app)}
-                                </Typography>
-                              </Box>
+                      : columnCards.map((app) => {
+                          const name = candidateName(app);
+                          const initials = name
+                            .split(" ")
+                            .slice(0, 2)
+                            .map((w) => w[0])
+                            .join("")
+                            .toUpperCase();
 
-                              {/* Email */}
-                              <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
-                                <EmailIcon fontSize="small" color="action" />
-                                <Typography
-                                  variant="body2"
-                                  color="text.secondary"
-                                  sx={{ wordBreak: "break-word" }}
-                                >
-                                  {candidateEmail(app)}
-                                </Typography>
-                              </Box>
-
-                              {/* Job label */}
-                              <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
-                                <WorkIcon fontSize="small" color="action" />
-                                <Typography variant="body2" color="text.secondary">
-                                  {jobs.find((j) => j._id === selectedJobId)?.title || ""}
-                                </Typography>
-                              </Box>
-
-                              {/* Move buttons */}
-                              <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
-                                {COLUMNS.filter((c) => c.id !== column.id).map((target) => (
-                                  <Button
-                                    key={target.id}
-                                    size="small"
-                                    variant="outlined"
-                                    color={target.color}
-                                    disabled={movingId === app._id}
-                                    startIcon={
-                                      movingId === app._id
-                                        ? <CircularProgress size={12} color="inherit" />
-                                        : null
-                                    }
-                                    onClick={() =>
-                                      handleMoveCard(app._id, target.id)
-                                    }
-                                    sx={{ fontSize: "0.7rem", px: 1, py: 0.4 }}
+                          return (
+                            <Card
+                              key={app._id}
+                              sx={{
+                                borderRadius: "14px",
+                                border: "1px solid #E2E8F0",
+                                boxShadow: "0 2px 8px -1px rgba(15, 23, 42, 0.04)",
+                                opacity: movingId === app._id ? 0.5 : 1,
+                                transition: "all 0.15s ease",
+                                "&:hover": {
+                                  borderColor: "#CBD5E1",
+                                  boxShadow: "0 6px 16px -2px rgba(15, 23, 42, 0.08)",
+                                },
+                              }}
+                            >
+                              <CardContent sx={{ p: "16px !important" }}>
+                                {/* Candidate Avatar + Name */}
+                                <Box sx={{ display: "flex", alignItems: "center", gap: 1.2, mb: 1 }}>
+                                  <Avatar
+                                    sx={{
+                                      width: 32,
+                                      height: 32,
+                                      fontSize: "0.75rem",
+                                      fontWeight: 700,
+                                      bgcolor: column.bg,
+                                      color: column.hex,
+                                    }}
                                   >
-                                    → {target.title}
-                                  </Button>
-                                ))}
-                              </Box>
-                            </CardContent>
-                          </Card>
-                        ))}
+                                    {initials}
+                                  </Avatar>
+                                  <Box sx={{ minWidth: 0, flex: 1 }}>
+                                    <Typography fontWeight={700} fontSize="0.875rem" noWrap sx={{ color: "#0F172A" }}>
+                                      {name}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary" noWrap sx={{ display: "block" }}>
+                                      {candidateEmail(app)}
+                                    </Typography>
+                                  </Box>
+                                </Box>
+
+                                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mt: 1, mb: 1.5 }}>
+                                  <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.7rem" }}>
+                                    Applied: {formatDate(app.createdAt)}
+                                  </Typography>
+                                </Box>
+
+                                {/* Action Transition Pills */}
+                                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, pt: 1, borderTop: "1px solid #F1F5F9" }}>
+                                  {COLUMNS.filter((c) => c.id !== column.id).map((target) => (
+                                    <Button
+                                      key={target.id}
+                                      size="small"
+                                      variant="outlined"
+                                      disabled={movingId === app._id}
+                                      onClick={() => handleMoveCard(app._id, target.id)}
+                                      sx={{
+                                        fontSize: "0.68rem",
+                                        py: 0.3,
+                                        px: 0.8,
+                                        borderColor: "#E2E8F0",
+                                        color: target.hex,
+                                        "&:hover": {
+                                          borderColor: target.hex,
+                                          backgroundColor: target.bg,
+                                        },
+                                      }}
+                                    >
+                                      → {target.title}
+                                    </Button>
+                                  ))}
+                                </Box>
+                              </CardContent>
+                            </Card>
+                          );
+                        })}
 
                     {/* Empty column placeholder */}
                     {!appsLoading && columnCards.length === 0 && (
                       <Box
                         sx={{
-                          border: "1px dashed",
-                          borderColor: "divider",
-                          borderRadius: 2,
+                          border: "1px dashed #CBD5E1",
+                          borderRadius: "12px",
                           p: 3,
                           textAlign: "center",
+                          my: "auto",
                         }}
                       >
-                        <Typography variant="body2" color="text.secondary">
-                          No candidates
+                        <Typography variant="caption" color="text.secondary">
+                          No candidates in {column.title}
                         </Typography>
                       </Box>
                     )}
@@ -338,7 +409,11 @@ function Kanban() {
       {/* Interview Scheduling Dialog */}
       <Dialog
         open={interviewOpen}
-        onClose={() => setInterviewOpen(false)}
+        onClose={() => {
+          setInterviewOpen(false);
+          setInterviewTargetId(null);
+          setInterviewDetails("");
+        }}
         maxWidth="sm"
         fullWidth
       >
@@ -360,15 +435,25 @@ function Kanban() {
             placeholder="Date: Tomorrow, 2:00 PM IST&#10;Platform: Google Meet&#10;Link: https://meet.google.com/xyz-abcd-efg"
           />
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setInterviewOpen(false)}>Cancel</Button>
+        <DialogActions sx={{ p: 2.5 }}>
+          <Button
+            onClick={() => {
+              setInterviewOpen(false);
+              setInterviewTargetId(null);
+              setInterviewDetails("");
+            }}
+          >
+            Cancel
+          </Button>
           <Button
             variant="contained"
-            color="info"
+            color="primary"
             onClick={async () => {
               const targetId = interviewTargetId;
               const details = interviewDetails;
               setInterviewOpen(false);
+              setInterviewTargetId(null);
+              setInterviewDetails("");
               await handleMoveCard(targetId, "Interview", details);
             }}
           >
@@ -376,22 +461,6 @@ function Kanban() {
           </Button>
         </DialogActions>
       </Dialog>
-
-      {/* Snackbar */}
-      <Snackbar
-        open={snackbarOpen}
-        autoHideDuration={3000}
-        onClose={() => setSnackbarOpen(false)}
-        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-      >
-        <Alert
-          severity={snackbarSeverity}
-          variant="filled"
-          onClose={() => setSnackbarOpen(false)}
-        >
-          {snackbarMessage}
-        </Alert>
-      </Snackbar>
     </Box>
   );
 }

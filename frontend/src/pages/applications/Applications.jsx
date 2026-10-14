@@ -19,7 +19,6 @@ import {
   Paper,
   Select,
   Skeleton,
-  Snackbar,
   Table,
   TableBody,
   TableCell,
@@ -47,6 +46,7 @@ import {
   fetchApplicationAnalysis,
   reanalyzeApplication,
 } from "../../services/applicationService";
+import { useToast } from "../../context/ToastContext";
 
 // Backend status enum (must match Application.js model)
 const PIPELINE_STATUSES = ["Applied", "Shortlisted", "Interview", "Offered", "Rejected"];
@@ -92,17 +92,12 @@ function Applications() {
   const [resumeError, setResumeError] = useState("");
   const [resumeCandidate, setResumeCandidate] = useState(null);
 
-  // ── Snackbar ─────────────────────────────────────────────────
-  const [snackbarOpen, setSnackbarOpen] = useState(false);
-  const [snackbarMessage, setSnackbarMessage] = useState("");
-  const [snackbarSeverity, setSnackbarSeverity] = useState("success");
+  // ── Toast & Helpers ──────────────────────────────────────────
+  const { showToast } = useToast();
 
-  // ── Helpers ───────────────────────────────────────────────────
   const showSnackbar = useCallback((message, severity = "success") => {
-    setSnackbarMessage(message);
-    setSnackbarSeverity(severity);
-    setSnackbarOpen(true);
-  }, []);
+    showToast(message, severity);
+  }, [showToast]);
 
   const handleJobChange = (e) => {
     const newId = e.target.value;
@@ -800,22 +795,6 @@ function Applications() {
           </Button>
         </DialogActions>
       </Dialog>
-
-      {/* Snackbar */}
-      <Snackbar
-        open={snackbarOpen}
-        autoHideDuration={4000}
-        onClose={() => setSnackbarOpen(false)}
-        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-      >
-        <Alert
-          severity={snackbarSeverity}
-          variant="filled"
-          onClose={() => setSnackbarOpen(false)}
-        >
-          {snackbarMessage}
-        </Alert>
-      </Snackbar>
     </>
   );
 }
