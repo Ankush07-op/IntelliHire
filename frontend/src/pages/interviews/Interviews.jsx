@@ -54,7 +54,7 @@ function Interviews() {
   const [newTime, setNewTime] = useState("");
   const [error, setError] = useState("");
 
-  // Day 21: Search and filter state
+  // Search and filter state
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [typeFilter, setTypeFilter] = useState("All");
@@ -103,6 +103,7 @@ function Interviews() {
     });
   };
 
+  // Update an invitation and persist it in localStorage.
   const updateInvitation = (id, changes) => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -133,6 +134,7 @@ function Interviews() {
       updatedAt: new Date().toISOString(),
     });
 
+  // Confirm cancellation or completion.
   const confirmInterviewAction = () => {
     if (!selectedInterview) return;
 
@@ -146,6 +148,7 @@ function Interviews() {
     }
   };
 
+  // Open reschedule dialog.
   const openReschedule = (interview) => {
     setError("");
     setNewDate(interview.date || "");
@@ -153,6 +156,7 @@ function Interviews() {
     setRescheduleInterview(interview);
   };
 
+  // Validate and save a new interview date and time.
   const confirmReschedule = () => {
     if (!rescheduleInterview || !newDate || !newTime) {
       setError("Please select both a new date and time.");
@@ -196,7 +200,22 @@ function Interviews() {
     }
   };
 
-  // Collect interview types dynamically from saved invitations.
+  // Day 22: Statistics calculated from all saved invitations.
+  const totalInterviews = interviews.length;
+
+  const scheduledInterviews = interviews.filter(
+    (interview) => !interview.status || interview.status === "Scheduled"
+  ).length;
+
+  const completedInterviews = interviews.filter(
+    (interview) => interview.status === "Completed"
+  ).length;
+
+  const cancelledInterviews = interviews.filter(
+    (interview) => interview.status === "Cancelled"
+  ).length;
+
+  // Interview types are generated dynamically from saved data.
   const interviewTypes = [
     ...new Set(
       interviews
@@ -205,13 +224,16 @@ function Interviews() {
     ),
   ].sort((a, b) => a.localeCompare(b));
 
-  // Apply search, status, and interview-type filters.
+  // Search and filters do not affect the summary card counts.
   const filteredInterviews = [...interviews]
     .reverse()
     .filter((interview) => {
       const query = searchTerm.trim().toLowerCase();
 
-      const candidateName = String(interview.candidateName || "").toLowerCase();
+      const candidateName = String(
+        interview.candidateName || ""
+      ).toLowerCase();
+
       const candidateEmail = String(
         interview.candidateEmail || ""
       ).toLowerCase();
@@ -240,6 +262,64 @@ function Interviews() {
     searchTerm.trim() !== "" ||
     statusFilter !== "All" ||
     typeFilter !== "All";
+
+  // Reusable statistics card.
+  const renderStatCard = (title, count, icon, color) => (
+    <Paper
+      variant="outlined"
+      sx={{
+        p: 2.5,
+        borderRadius: 2,
+        height: "100%",
+        borderTop: 3,
+        borderTopColor: `${color}.main`,
+        transition: "box-shadow 0.2s, transform 0.2s",
+        "&:hover": {
+          boxShadow: 3,
+          transform: "translateY(-2px)",
+        },
+      }}
+    >
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 2,
+        }}
+      >
+        <Box sx={{ minWidth: 0 }}>
+          <Typography variant="body2" color="text.secondary">
+            {title}
+          </Typography>
+
+          <Typography
+            variant="h4"
+            fontWeight={700}
+            sx={{ mt: 1 }}
+          >
+            {count}
+          </Typography>
+        </Box>
+
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+            width: 48,
+            height: 48,
+            borderRadius: 2,
+            bgcolor: `${color}.light`,
+            color: `${color}.dark`,
+          }}
+        >
+          {icon}
+        </Box>
+      </Box>
+    </Paper>
+  );
 
   return (
     <Box sx={{ width: "100%", minWidth: 0 }}>
@@ -275,18 +355,55 @@ function Interviews() {
         </Alert>
       )}
 
-      {/* Total invitations */}
-      <Paper variant="outlined" sx={{ p: 2, mb: 3, borderRadius: 2 }}>
-        <Typography color="text.secondary" variant="body2">
-          Total saved invitations
-        </Typography>
+      {/* Day 22: Interview statistics */}
+      <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>
+        Interview Overview
+      </Typography>
 
-        <Typography variant="h4" fontWeight={700}>
-          {interviews.length}
-        </Typography>
-      </Paper>
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: {
+            xs: "1fr",
+            sm: "repeat(2, minmax(0, 1fr))",
+            lg: "repeat(4, minmax(0, 1fr))",
+          },
+          gap: 2,
+          mb: 3,
+        }}
+      >
+        {renderStatCard(
+          "Total Interviews",
+          totalInterviews,
+          <EventIcon sx={{ fontSize: 28 }} />,
+          "primary"
+        )}
 
-      {/* Day 21: Search and filters */}
+        {renderStatCard(
+          "Scheduled",
+          scheduledInterviews,
+          <EditCalendarIcon sx={{ fontSize: 28 }} />,
+          "info"
+        )}
+
+        {renderStatCard(
+          "Completed",
+          completedInterviews,
+          <Box component="span" sx={{ fontSize: 28, fontWeight: 700 }}>
+            ✓
+          </Box>,
+          "success"
+        )}
+
+        {renderStatCard(
+          "Cancelled",
+          cancelledInterviews,
+          <CancelOutlinedIcon sx={{ fontSize: 28 }} />,
+          "error"
+        )}
+      </Box>
+
+      {/* Search and filters */}
       <Paper variant="outlined" sx={{ p: 2, mb: 3, borderRadius: 2 }}>
         <Typography variant="h6" fontWeight={600} sx={{ mb: 2 }}>
           Search and Filter Interviews
@@ -368,6 +485,7 @@ function Interviews() {
         </Typography>
       </Paper>
 
+      {/* Interview table */}
       {interviews.length === 0 ? (
         <Alert severity="info">
           No interviews scheduled yet. Open Candidate Ranking and use
@@ -508,7 +626,7 @@ function Interviews() {
         emails or notify candidates.
       </Typography>
 
-      {/* Cancel or complete confirmation dialog */}
+      {/* Cancellation and completion confirmation */}
       <Dialog
         open={Boolean(selectedInterview)}
         onClose={() => setSelectedInterview(null)}
