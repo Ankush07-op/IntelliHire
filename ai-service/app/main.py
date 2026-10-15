@@ -1,17 +1,23 @@
+﻿
 import os
 import tempfile
-import urllib.request
-import uuid
-from typing import Optional
+from pathlib import Path
 
-from dotenv import load_dotenv
-from fastapi import FastAPI, File, HTTPException, UploadFile
-from pydantic import BaseModel
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 
-from app.llm_matcher import analyze_match
+from app.llm_matcher import (
+    extract_skills_with_gemini,
+    match_resume_with_gemini,
+)
 from app.parser import parse_resume
 
-load_dotenv()
+
+import urllib.request
+import urllib.error
+import uuid
+from typing import Optional
+from pydantic import BaseModel
+from llm_matcher import analyze_match
 
 app = FastAPI(
     title="IntelliHire AI Service",
@@ -19,12 +25,24 @@ app = FastAPI(
     version="1.0.0",
 )
 
+ALLOWED_EXTENSIONS = {".pdf", ".docx"}
 
-class AnalyzeRequest(BaseModel):
-    application_id: Optional[str] = None
-    resume_url: str
-    job_description: str
-    required_skills: list[str] = []
+
+def validate_resume_filename(filename: str | None) -> None:
+    """Validate that a resume has a supported file extension."""
+    if not filename:
+        raise HTTPException(
+            status_code=400,
+            detail="Resume file is required.",
+        )
+
+    extension = Path(filename).suffix.lower()
+
+    if extension not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail="Only PDF and DOCX resume files are supported.",
+        )
 
 
 @app.get("/health")
@@ -37,28 +55,21 @@ def health_check():
 
 @app.post("/api/resume/parse")
 async def parse_resume_endpoint(file: UploadFile = File(...)):
-    if not file.filename:
-        raise HTTPException(
-            status_code=400,
-            detail="Resume file is required.",
-        )
+    validate_resume_filename(file.filename)
 
-    allowed_extensions = {".pdf", ".docx"}
-    filename = file.filename.lower()
-
-    if not any(filename.endswith(extension) for extension in allowed_extensions):
-        raise HTTPException(
-            status_code=400,
-            detail="Only PDF and DOCX resume files are supported.",
-        )
-
-    ext = os.path.splitext(filename)[1]
-    unique_id = uuid.uuid4().hex
-    temp_file = os.path.join(tempfile.gettempdir(), f"parse_{unique_id}{ext}")
+    temp_file = None
 
     try:
-        content = await file.read()
-        with open(temp_file, "wb") as output_file:
+        suffix = Path(file.filename).suffix.lower()
+
+        with tempfile.NamedTemporaryFile(
+            mode="wb",
+            suffix=suffix,
+            prefix="intellihire_resume_",
+            delete=False,
+        ) as output_file:
+            temp_file = output_file.name
+            content = await file.read()
             output_file.write(content)
 
         result = parse_resume(temp_file)
@@ -82,12 +93,138 @@ async def parse_resume_endpoint(file: UploadFile = File(...)):
         ) from exc
 
     finally:
-        if os.path.exists(temp_file):
-            try:
-                os.remove(temp_file)
-            except OSError:
-                pass
+        await file.close()
 
+        if temp_file and os.path.exists(temp_file):
+            os.remove(temp_file)
+
+
+@app.post("/api/resume/ai-extract")
+async def ai_extract_resume_skills(file: UploadFile = File(...)):
+    validate_resume_filename(file.filename)
+
+    temp_file = None
+
+    try:
+        suffix = Path(file.filename).suffix.lower()
+
+        with tempfile.NamedTemporaryFile(
+            mode="wb",
+            suffix=suffix,
+            prefix="intellihire_resume_",
+            delete=False,
+        ) as output_file:
+            temp_file = output_file.name
+            content = await file.read()
+            output_file.write(content)
+
+        parsed_resume = parse_resume(temp_file)
+
+        ai_result = extract_skills_with_gemini(
+            parsed_resume["raw_text"]
+        )
+
+        return {
+            "success": True,
+            "filename": file.filename,
+            "ai": ai_result,
+        }
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+        ) from exc
+
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=str(exc),
+        ) from exc
+
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"AI resume processing failed: {str(exc)}",
+        ) from exc
+
+    finally:
+        await file.close()
+
+        if temp_file and os.path.exists(temp_file):
+            os.remove(temp_file)
+
+
+@app.post("/api/resume/match")
+async def match_resume_endpoint(
+    file: UploadFile = File(...),
+    job_description: str = Form(...),
+):
+    validate_resume_filename(file.filename)
+
+    if not job_description.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="Job description is required.",
+        )
+
+    temp_file = None
+
+    try:
+        suffix = Path(file.filename).suffix.lower()
+
+        with tempfile.NamedTemporaryFile(
+            mode="wb",
+            suffix=suffix,
+            prefix="intellihire_resume_",
+            delete=False,
+        ) as output_file:
+            temp_file = output_file.name
+            content = await file.read()
+            output_file.write(content)
+
+        parsed_resume = parse_resume(temp_file)
+
+        match_result = match_resume_with_gemini(
+            parsed_resume["raw_text"],
+            job_description,
+        )
+
+        return {
+            "success": True,
+            "filename": file.filename,
+            "match": match_result,
+        }
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+        ) from exc
+
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=str(exc),
+        ) from exc
+
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Resume matching failed: {str(exc)}",
+        ) from exc
+
+    finally:
+        await file.close()
+
+        if temp_file and os.path.exists(temp_file):
+            os.remove(temp_file)
+
+class AnalyzeRequest(BaseModel):
+    application_id: Optional[str] = None
+    resume_url: str
+    job_description: str
+    required_skills: list[str] = []
 
 @app.post("/api/analyze")
 async def analyze_endpoint(request: AnalyzeRequest):
@@ -157,3 +294,4 @@ async def analyze_endpoint(request: AnalyzeRequest):
                 os.remove(temp_file)
             except OSError:
                 pass
+
