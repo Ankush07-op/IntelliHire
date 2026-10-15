@@ -1,5 +1,5 @@
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   Alert,
@@ -19,6 +19,7 @@ import {
   TableCell,
   TableContainer,
   TableHead,
+  TablePagination,
   TableRow,
   TextField,
   Typography,
@@ -54,6 +55,7 @@ const getInterviewTimestamp = (interview) => {
   if (!date) return Number.POSITIVE_INFINITY;
 
   const dateTime = new Date(`${date}T${time || "23:59"}`);
+
   return Number.isNaN(dateTime.getTime())
     ? Number.POSITIVE_INFINITY
     : dateTime.getTime();
@@ -67,18 +69,25 @@ function Interviews() {
   const [newTime, setNewTime] = useState("");
   const [error, setError] = useState("");
 
-  // Search, filter, and sorting state
+  // Search, filtering, sorting, and pagination.
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [typeFilter, setTypeFilter] = useState("All");
   const [sortOrder, setSortOrder] = useState("date-asc");
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(5);
 
+  // Load locally saved invitations.
   useEffect(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       const parsed = saved ? JSON.parse(saved) : [];
 
-      setInterviews(Array.isArray(parsed) ? parsed : []);
+      if (!Array.isArray(parsed)) {
+        throw new Error("Invalid saved interview data.");
+      }
+
+      setInterviews(parsed);
     } catch {
       setInterviews([]);
       setError("Unable to read saved interview invitations.");
@@ -148,21 +157,17 @@ function Interviews() {
       updatedAt: new Date().toISOString(),
     });
 
-  // Confirm cancellation or completion.
   const confirmInterviewAction = () => {
     if (!selectedInterview) return;
 
     const status =
       selectedInterview.action === "Complete" ? "Completed" : "Cancelled";
 
-    const success = updateInvitationStatus(selectedInterview.id, status);
-
-    if (success) {
+    if (updateInvitationStatus(selectedInterview.id, status)) {
       setSelectedInterview(null);
     }
   };
 
-  // Open the reschedule dialog.
   const openReschedule = (interview) => {
     setError("");
     setNewDate(interview.date || "");
@@ -170,7 +175,6 @@ function Interviews() {
     setRescheduleInterview(interview);
   };
 
-  // Validate and save a new interview date and time.
   const confirmReschedule = () => {
     if (!rescheduleInterview || !newDate || !newTime) {
       setError("Please select both a new date and time.");
@@ -189,14 +193,14 @@ function Interviews() {
       return;
     }
 
-    const success = updateInvitation(rescheduleInterview.id, {
-      date: newDate,
-      time: newTime,
-      status: "Scheduled",
-      updatedAt: new Date().toISOString(),
-    });
-
-    if (success) {
+    if (
+      updateInvitation(rescheduleInterview.id, {
+        date: newDate,
+        time: newTime,
+        status: "Scheduled",
+        updatedAt: new Date().toISOString(),
+      })
+    ) {
       setRescheduleInterview(null);
       setNewDate("");
       setNewTime("");
@@ -229,72 +233,114 @@ function Interviews() {
     (interview) => interview.status === "Cancelled"
   ).length;
 
-  // Generate interview types dynamically.
-  const interviewTypes = [
-    ...new Set(
-      interviews
-        .map((interview) => interview.type)
-        .filter((type) => typeof type === "string" && type.trim())
-    ),
-  ].sort((a, b) => a.localeCompare(b));
+  const interviewTypes = useMemo(
+    () =>
+      [
+        ...new Set(
+          interviews
+            .map((interview) => interview.type)
+            .filter((type) => typeof type === "string" && type.trim())
+        ),
+      ].sort((a, b) => a.localeCompare(b)),
+    [interviews]
+  );
 
-  // Apply search and filters first, then apply sorting.
-  const filteredInterviews = interviews
-    .filter((interview) => {
-      const query = searchTerm.trim().toLowerCase();
+  // Filter first, then sort.
+  const filteredInterviews = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase();
 
-      const candidateName = String(
-        interview.candidateName || ""
-      ).toLowerCase();
+    return interviews
+      .filter((interview) => {
+        const candidateName = String(
+          interview.candidateName || ""
+        ).toLowerCase();
 
-      const candidateEmail = String(
-        interview.candidateEmail || ""
-      ).toLowerCase();
+        const candidateEmail = String(
+          interview.candidateEmail || ""
+        ).toLowerCase();
 
-      const matchesSearch =
-        candidateName.includes(query) || candidateEmail.includes(query);
+        const matchesSearch =
+          candidateName.includes(query) || candidateEmail.includes(query);
 
-      const status = interview.status || "Scheduled";
+        const status = interview.status || "Scheduled";
 
-      const matchesStatus =
-        statusFilter === "All" || status === statusFilter;
+        const matchesStatus =
+          statusFilter === "All" || status === statusFilter;
 
-      const matchesType =
-        typeFilter === "All" || interview.type === typeFilter;
+        const matchesType =
+          typeFilter === "All" || interview.type === typeFilter;
 
-      return matchesSearch && matchesStatus && matchesType;
-    })
-    .sort((a, b) => {
-      const nameA = String(a.candidateName || "Candidate").trim();
-      const nameB = String(b.candidateName || "Candidate").trim();
+        return matchesSearch && matchesStatus && matchesType;
+      })
+      .sort((a, b) => {
+        const nameA = String(a.candidateName || "Candidate").trim();
+        const nameB = String(b.candidateName || "Candidate").trim();
 
-      const dateA = getInterviewTimestamp(a);
-      const dateB = getInterviewTimestamp(b);
+        const dateA = getInterviewTimestamp(a);
+        const dateB = getInterviewTimestamp(b);
 
-      switch (sortOrder) {
-        case "date-desc":
-          return dateB - dateA;
+        switch (sortOrder) {
+          case "date-desc":
+            return dateB - dateA;
 
-        case "name-asc":
-          return nameA.localeCompare(nameB, undefined, {
-            sensitivity: "base",
-          });
+          case "name-asc":
+            return nameA.localeCompare(nameB, undefined, {
+              sensitivity: "base",
+            });
 
-        case "name-desc":
-          return nameB.localeCompare(nameA, undefined, {
-            sensitivity: "base",
-          });
+          case "name-desc":
+            return nameB.localeCompare(nameA, undefined, {
+              sensitivity: "base",
+            });
 
-        case "date-asc":
-        default:
-          return dateA - dateB;
-      }
-    });
+          case "date-asc":
+          default:
+            return dateA - dateB;
+        }
+      });
+  }, [interviews, searchTerm, statusFilter, typeFilter, sortOrder]);
+
+  // Reset pagination when the search, filters, or sorting changes.
+  useEffect(() => {
+    setPage(0);
+  }, [searchTerm, statusFilter, typeFilter, sortOrder]);
+
+  // Keep the current page within range after an interview update.
+  useEffect(() => {
+    const lastPage = Math.max(
+      0,
+      Math.ceil(filteredInterviews.length / rowsPerPage) - 1
+    );
+
+    if (page > lastPage) {
+      setPage(lastPage);
+    }
+  }, [filteredInterviews.length, rowsPerPage, page]);
+
+  const paginatedInterviews = useMemo(
+    () =>
+      filteredInterviews.slice(
+        page * rowsPerPage,
+        page * rowsPerPage + rowsPerPage
+      ),
+    [filteredInterviews, page, rowsPerPage]
+  );
+
+  const handlePageChange = (_event, newPage) => {
+    setPage(newPage);
+  };
+
+  const handleRowsPerPageChange = (event) => {
+    setRowsPerPage(Number(event.target.value));
+    setPage(0);
+  };
 
   const clearFilters = () => {
     setSearchTerm("");
     setStatusFilter("All");
     setTypeFilter("All");
+    setSortOrder("date-asc");
+    setPage(0);
   };
 
   const filtersActive =
@@ -302,7 +348,6 @@ function Interviews() {
     statusFilter !== "All" ||
     typeFilter !== "All";
 
-  // Reusable statistics card.
   const renderStatCard = (title, count, icon, color) => (
     <Paper
       variant="outlined"
@@ -446,7 +491,6 @@ function Interviews() {
             gridTemplateColumns: {
               xs: "1fr",
               sm: "repeat(2, minmax(0, 1fr))",
-              md: "repeat(2, minmax(0, 1fr))",
               lg: "2fr repeat(3, minmax(140px, 1fr)) auto",
             },
             gap: 2,
@@ -519,7 +563,7 @@ function Interviews() {
           <Button
             variant="outlined"
             onClick={clearFilters}
-            disabled={!filtersActive}
+            disabled={!filtersActive && sortOrder === "date-asc"}
             sx={{ whiteSpace: "nowrap" }}
           >
             Clear Filters
@@ -527,137 +571,169 @@ function Interviews() {
         </Box>
 
         <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-          Showing {filteredInterviews.length} of {interviews.length} interviews
+          Showing{" "}
+          {filteredInterviews.length === 0
+            ? 0
+            : page * rowsPerPage + 1}
+          {"–"}
+          {Math.min((page + 1) * rowsPerPage, filteredInterviews.length)} of{" "}
+          {filteredInterviews.length} matching interviews ({interviews.length}{" "}
+          total)
         </Typography>
       </Paper>
 
       {/* Interview table */}
       {interviews.length === 0 ? (
         <Alert severity="info">
-          No interviews scheduled yet. Open Candidate Ranking and use
-          "Invite for Interview" to save an interview invitation.
+          No interviews scheduled yet. Open Candidate Ranking and use "Invite
+          for Interview" to save an interview invitation.
         </Alert>
       ) : (
-        <TableContainer
-          component={Paper}
-          variant="outlined"
-          sx={{ borderRadius: 2, overflowX: "auto" }}
-        >
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Candidate</TableCell>
-                <TableCell>Date</TableCell>
-                <TableCell>Time</TableCell>
-                <TableCell>Interview Type</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell>Action</TableCell>
-              </TableRow>
-            </TableHead>
-
-            <TableBody>
-              {filteredInterviews.length === 0 && (
+        <>
+          <TableContainer
+            component={Paper}
+            variant="outlined"
+            sx={{ borderRadius: 2, overflowX: "auto" }}
+          >
+            <Table>
+              <TableHead>
                 <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
-                    <Typography color="text.secondary">
-                      No interviews match your search or filters.
-                    </Typography>
-
-                    <Button onClick={clearFilters} sx={{ mt: 1 }}>
-                      Clear Filters
-                    </Button>
-                  </TableCell>
+                  <TableCell>Candidate</TableCell>
+                  <TableCell>Date</TableCell>
+                  <TableCell>Time</TableCell>
+                  <TableCell>Interview Type</TableCell>
+                  <TableCell>Status</TableCell>
+                  <TableCell>Action</TableCell>
                 </TableRow>
-              )}
+              </TableHead>
 
-              {filteredInterviews.map((interview) => {
-                const cancelled = interview.status === "Cancelled";
-                const completed = interview.status === "Completed";
-                const locked = cancelled || completed;
-
-                return (
-                  <TableRow key={interview.id} hover>
-                    <TableCell>
-                      <Typography fontWeight={600}>
-                        {interview.candidateName || "Candidate"}
+              <TableBody>
+                {filteredInterviews.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                      <Typography color="text.secondary">
+                        No interviews match your search or filters.
                       </Typography>
 
-                      {interview.candidateEmail && (
-                        <Typography variant="body2" color="text.secondary">
-                          {interview.candidateEmail}
-                        </Typography>
-                      )}
-                    </TableCell>
-
-                    <TableCell>{formatDate(interview.date)}</TableCell>
-                    <TableCell>{formatTime(interview.time)}</TableCell>
-                    <TableCell>{interview.type || "—"}</TableCell>
-
-                    <TableCell>
-                      <Chip
-                        label={interview.status || "Scheduled"}
-                        color={getStatusColor(interview.status)}
-                        size="small"
-                        variant="outlined"
-                      />
-                    </TableCell>
-
-                    <TableCell>
-                      <Box
-                        sx={{
-                          display: "flex",
-                          gap: 1,
-                          flexWrap: "wrap",
-                          minWidth: 150,
-                        }}
-                      >
-                        <Button
-                          size="small"
-                          startIcon={<EditCalendarIcon />}
-                          disabled={locked}
-                          onClick={() => openReschedule(interview)}
-                        >
-                          Reschedule
-                        </Button>
-
-                        <Button
-                          size="small"
-                          color="error"
-                          startIcon={<CancelOutlinedIcon />}
-                          disabled={locked}
-                          onClick={() => {
-                            setError("");
-                            setSelectedInterview({
-                              ...interview,
-                              action: "Cancel",
-                            });
-                          }}
-                        >
-                          {cancelled ? "Cancelled" : "Cancel"}
-                        </Button>
-
-                        <Button
-                          size="small"
-                          color="success"
-                          disabled={locked}
-                          onClick={() => {
-                            setError("");
-                            setSelectedInterview({
-                              ...interview,
-                              action: "Complete",
-                            });
-                          }}
-                        >
-                          {completed ? "✓ Completed" : "✓ Mark Completed"}
-                        </Button>
-                      </Box>
+                      <Button onClick={clearFilters} sx={{ mt: 1 }}>
+                        Clear Filters
+                      </Button>
                     </TableCell>
                   </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </TableContainer>
+                ) : (
+                  paginatedInterviews.map((interview) => {
+                    const cancelled = interview.status === "Cancelled";
+                    const completed = interview.status === "Completed";
+                    const locked = cancelled || completed;
+
+                    return (
+                      <TableRow key={interview.id} hover>
+                        <TableCell>
+                          <Typography fontWeight={600}>
+                            {interview.candidateName || "Candidate"}
+                          </Typography>
+
+                          {interview.candidateEmail && (
+                            <Typography
+                              variant="body2"
+                              color="text.secondary"
+                            >
+                              {interview.candidateEmail}
+                            </Typography>
+                          )}
+                        </TableCell>
+
+                        <TableCell>{formatDate(interview.date)}</TableCell>
+                        <TableCell>{formatTime(interview.time)}</TableCell>
+                        <TableCell>{interview.type || "—"}</TableCell>
+
+                        <TableCell>
+                          <Chip
+                            label={interview.status || "Scheduled"}
+                            color={getStatusColor(interview.status)}
+                            size="small"
+                            variant="outlined"
+                          />
+                        </TableCell>
+
+                        <TableCell>
+                          <Box
+                            sx={{
+                              display: "flex",
+                              gap: 1,
+                              flexWrap: "wrap",
+                              minWidth: 150,
+                            }}
+                          >
+                            <Button
+                              size="small"
+                              startIcon={<EditCalendarIcon />}
+                              disabled={locked}
+                              onClick={() => openReschedule(interview)}
+                            >
+                              Reschedule
+                            </Button>
+
+                            <Button
+                              size="small"
+                              color="error"
+                              startIcon={<CancelOutlinedIcon />}
+                              disabled={locked}
+                              onClick={() => {
+                                setError("");
+                                setSelectedInterview({
+                                  ...interview,
+                                  action: "Cancel",
+                                });
+                              }}
+                            >
+                              {cancelled ? "Cancelled" : "Cancel"}
+                            </Button>
+
+                            <Button
+                              size="small"
+                              color="success"
+                              disabled={locked}
+                              onClick={() => {
+                                setError("");
+                                setSelectedInterview({
+                                  ...interview,
+                                  action: "Complete",
+                                });
+                              }}
+                            >
+                              {completed ? "✓ Completed" : "✓ Mark Completed"}
+                            </Button>
+                          </Box>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+
+          {filteredInterviews.length > 0 && (
+            <Paper
+              variant="outlined"
+              sx={{ mt: 1, borderRadius: 2, overflowX: "auto" }}
+            >
+              <TablePagination
+                component="div"
+                count={filteredInterviews.length}
+                page={page}
+                onPageChange={handlePageChange}
+                rowsPerPage={rowsPerPage}
+                onRowsPerPageChange={handleRowsPerPageChange}
+                rowsPerPageOptions={[5, 10, 25]}
+                labelRowsPerPage="Interviews per page:"
+                showFirstButton
+                showLastButton
+              />
+            </Paper>
+          )}
+        </>
       )}
 
       <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
