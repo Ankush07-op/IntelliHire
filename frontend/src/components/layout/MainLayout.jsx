@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { Box } from "@mui/material";
 import { Outlet } from "react-router-dom";
 
@@ -19,26 +19,35 @@ function MainLayout() {
   };
 
   return (
-    <Box sx={{ display: "flex", minHeight: "100vh", backgroundColor: "background.default" }}>
+    <Box
+      sx={{
+        display: "flex",
+        minHeight: "100vh",
+        backgroundColor: "background.default",
+      }}
+    >
       <Navbar onDrawerToggle={handleDrawerToggle} />
 
-      <Sidebar mobileOpen={mobileOpen} onMobileClose={handleMobileClose} />
+      <Sidebar
+        mobileOpen={mobileOpen}
+        onMobileClose={handleMobileClose}
+      />
 
       <Box
         component="main"
         sx={{
           flexGrow: 1,
-          p: { xs: 2, sm: 3 },
+          minWidth: 0,
           width: { xs: "100%", md: `calc(100% - ${drawerWidth}px)` },
           maxWidth: "100vw",
           overflowX: "hidden",
+          p: { xs: 2, sm: 3 },
+          pt: { xs: 10, sm: 11 },
           minHeight: "100vh",
           backgroundColor: "background.default",
         }}
       >
-        <Box sx={{ mt: 8 }}>
-          <Outlet />
-        </Box>
+        <Outlet />
       </Box>
     </Box>
   );

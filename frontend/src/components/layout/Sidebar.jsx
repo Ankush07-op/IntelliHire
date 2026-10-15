@@ -1,4 +1,4 @@
-import {
+﻿import {
   Drawer,
   List,
   ListItem,
@@ -16,6 +16,7 @@ import PeopleIcon from "@mui/icons-material/People";
 import ViewKanbanIcon from "@mui/icons-material/ViewKanban";
 import BarChartIcon from "@mui/icons-material/BarChart";
 import LogoutIcon from "@mui/icons-material/Logout";
+import EventIcon from "@mui/icons-material/Event";
 
 import { useAuth } from "../../context/useAuth";
 import { Link, useNavigate, useLocation } from "react-router-dom";
@@ -31,7 +32,7 @@ function Sidebar({ mobileOpen = false, onMobileClose }) {
     {
       text: "Dashboard",
       icon: <DashboardIcon sx={{ fontSize: 20 }} />,
-      path: "/dashboard",
+      path: "/recruiter/dashboard",
     },
     {
       text: "Jobs",
@@ -46,25 +47,46 @@ function Sidebar({ mobileOpen = false, onMobileClose }) {
     {
       text: "Kanban Board",
       icon: <ViewKanbanIcon sx={{ fontSize: 20 }} />,
-      path: "/kanban",
+      path: "/recruiter/kanban",
     },
     {
       text: "Candidate Rankings",
       icon: <BarChartIcon sx={{ fontSize: 20 }} />,
-      path: "/ranking",
+      path: "/recruiter/ranking",
+    },
+    {
+      text: "Interviews",
+      icon: <EventIcon sx={{ fontSize: 20 }} />,
+      path: "/recruiter/interviews",
     },
   ];
 
   const handleLogout = () => {
-    if (onMobileClose) onMobileClose();
+    onMobileClose?.();
     logout();
     navigate("/recruiter/login", { replace: true });
   };
 
   const drawerContent = (
-    <Box sx={{ display: "flex", flexDirection: "column", height: { xs: "100%", md: "calc(100vh - 64px)" }, p: 1.5 }}>
-      {/* Brand Header visible in Mobile Drawer */}
-      <Box sx={{ display: { xs: "flex", md: "none" }, alignItems: "center", gap: 1.5, px: 1, py: 1.5, mb: 1, borderBottom: "1px solid #F1F5F9" }}>
+    <Box
+      sx={{
+        display: "flex",
+        flexDirection: "column",
+        height: { xs: "100%", md: "calc(100vh - 64px)" },
+        p: 1.5,
+      }}
+    >
+      <Box
+        sx={{
+          display: { xs: "flex", md: "none" },
+          alignItems: "center",
+          gap: 1.5,
+          px: 1,
+          py: 1.5,
+          mb: 1,
+          borderBottom: "1px solid #F1F5F9",
+        }}
+      >
         <Box
           sx={{
             width: 32,
@@ -81,7 +103,7 @@ function Sidebar({ mobileOpen = false, onMobileClose }) {
         >
           I
         </Box>
-        <Typography variant="subtitle1" fontWeight={800} sx={{ color: "#0F172A", letterSpacing: "-0.01em" }}>
+        <Typography variant="subtitle1" fontWeight={800} sx={{ color: "#0F172A" }}>
           IntelliHire
         </Typography>
       </Box>
@@ -89,23 +111,26 @@ function Sidebar({ mobileOpen = false, onMobileClose }) {
       <List sx={{ flex: 1, py: 1 }}>
         {menuItems.map((item) => {
           const isActive = location.pathname === item.path;
+
           return (
             <ListItem key={item.text} disablePadding sx={{ mb: 0.8 }}>
               <ListItemButton
                 component={Link}
                 to={item.path}
                 onClick={onMobileClose}
+                selected={isActive}
                 sx={{
                   borderRadius: "10px",
                   py: 1,
                   px: 1.5,
                   backgroundColor: isActive ? "#EEF2FF" : "transparent",
                   color: isActive ? "#4F46E5" : "#475569",
-                  fontWeight: isActive ? 700 : 500,
-                  transition: "all 0.15s ease",
+                  "&.Mui-selected": {
+                    backgroundColor: "#EEF2FF",
+                    color: "#4F46E5",
+                  },
                   "&:hover": {
                     backgroundColor: isActive ? "#E0E7FF" : "#F8FAFC",
-                    color: isActive ? "#4338CA" : "#0F172A",
                   },
                 }}
               >
@@ -133,7 +158,6 @@ function Sidebar({ mobileOpen = false, onMobileClose }) {
 
       <Divider sx={{ my: 1, borderColor: "#F1F5F9" }} />
 
-      {/* Logout */}
       <ListItem disablePadding sx={{ pb: 1 }}>
         <ListItemButton
           onClick={handleLogout}
@@ -142,22 +166,15 @@ function Sidebar({ mobileOpen = false, onMobileClose }) {
             py: 1,
             px: 1.5,
             color: "#EF4444",
-            transition: "all 0.15s ease",
-            "&:hover": {
-              backgroundColor: "#FEF2F2",
-            },
+            "&:hover": { backgroundColor: "#FEF2F2" },
           }}
         >
           <ListItemIcon sx={{ minWidth: 36, color: "#EF4444" }}>
             <LogoutIcon sx={{ fontSize: 20 }} />
           </ListItemIcon>
-
           <ListItemText
             primary="Sign out"
-            primaryTypographyProps={{
-              fontSize: "0.875rem",
-              fontWeight: 600,
-            }}
+            primaryTypographyProps={{ fontSize: "0.875rem", fontWeight: 600 }}
           />
         </ListItemButton>
       </ListItem>
@@ -166,14 +183,11 @@ function Sidebar({ mobileOpen = false, onMobileClose }) {
 
   return (
     <Box component="nav" sx={{ width: { md: drawerWidth }, flexShrink: { md: 0 } }}>
-      {/* Mobile Drawer (Temporary) */}
       <Drawer
         variant="temporary"
         open={mobileOpen}
         onClose={onMobileClose}
-        ModalProps={{
-          keepMounted: true, // Improves performance on mobile devices
-        }}
+        ModalProps={{ keepMounted: true }}
         sx={{
           display: { xs: "block", md: "none" },
           "& .MuiDrawer-paper": {
@@ -186,9 +200,9 @@ function Sidebar({ mobileOpen = false, onMobileClose }) {
         {drawerContent}
       </Drawer>
 
-      {/* Desktop Drawer (Permanent) */}
       <Drawer
         variant="permanent"
+        open
         sx={{
           display: { xs: "none", md: "block" },
           width: drawerWidth,
@@ -197,11 +211,11 @@ function Sidebar({ mobileOpen = false, onMobileClose }) {
             width: drawerWidth,
             boxSizing: "border-box",
             top: "64px",
+            height: "calc(100% - 64px)",
             borderRight: "1px solid #E2E8F0",
             backgroundColor: "#FFFFFF",
           },
         }}
-        open
       >
         {drawerContent}
       </Drawer>
