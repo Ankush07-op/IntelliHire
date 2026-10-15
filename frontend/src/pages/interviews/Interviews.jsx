@@ -1,4 +1,6 @@
+
 import { useEffect, useState } from "react";
+
 import {
   Alert,
   Box,
@@ -46,6 +48,17 @@ const getCurrentTime = () => {
   ).padStart(2, "0")}`;
 };
 
+const getInterviewTimestamp = (interview) => {
+  const { date, time } = interview;
+
+  if (!date) return Number.POSITIVE_INFINITY;
+
+  const dateTime = new Date(`${date}T${time || "23:59"}`);
+  return Number.isNaN(dateTime.getTime())
+    ? Number.POSITIVE_INFINITY
+    : dateTime.getTime();
+};
+
 function Interviews() {
   const [interviews, setInterviews] = useState([]);
   const [selectedInterview, setSelectedInterview] = useState(null);
@@ -54,10 +67,11 @@ function Interviews() {
   const [newTime, setNewTime] = useState("");
   const [error, setError] = useState("");
 
-  // Search and filter state
+  // Search, filter, and sorting state
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [typeFilter, setTypeFilter] = useState("All");
+  const [sortOrder, setSortOrder] = useState("date-asc");
 
   useEffect(() => {
     try {
@@ -148,7 +162,7 @@ function Interviews() {
     }
   };
 
-  // Open reschedule dialog.
+  // Open the reschedule dialog.
   const openReschedule = (interview) => {
     setError("");
     setNewDate(interview.date || "");
@@ -200,7 +214,7 @@ function Interviews() {
     }
   };
 
-  // Day 22: Statistics calculated from all saved invitations.
+  // Statistics are calculated from all saved invitations.
   const totalInterviews = interviews.length;
 
   const scheduledInterviews = interviews.filter(
@@ -215,7 +229,7 @@ function Interviews() {
     (interview) => interview.status === "Cancelled"
   ).length;
 
-  // Interview types are generated dynamically from saved data.
+  // Generate interview types dynamically.
   const interviewTypes = [
     ...new Set(
       interviews
@@ -224,9 +238,8 @@ function Interviews() {
     ),
   ].sort((a, b) => a.localeCompare(b));
 
-  // Search and filters do not affect the summary card counts.
-  const filteredInterviews = [...interviews]
-    .reverse()
+  // Apply search and filters first, then apply sorting.
+  const filteredInterviews = interviews
     .filter((interview) => {
       const query = searchTerm.trim().toLowerCase();
 
@@ -250,6 +263,32 @@ function Interviews() {
         typeFilter === "All" || interview.type === typeFilter;
 
       return matchesSearch && matchesStatus && matchesType;
+    })
+    .sort((a, b) => {
+      const nameA = String(a.candidateName || "Candidate").trim();
+      const nameB = String(b.candidateName || "Candidate").trim();
+
+      const dateA = getInterviewTimestamp(a);
+      const dateB = getInterviewTimestamp(b);
+
+      switch (sortOrder) {
+        case "date-desc":
+          return dateB - dateA;
+
+        case "name-asc":
+          return nameA.localeCompare(nameB, undefined, {
+            sensitivity: "base",
+          });
+
+        case "name-desc":
+          return nameB.localeCompare(nameA, undefined, {
+            sensitivity: "base",
+          });
+
+        case "date-asc":
+        default:
+          return dateA - dateB;
+      }
     });
 
   const clearFilters = () => {
@@ -293,11 +332,7 @@ function Interviews() {
             {title}
           </Typography>
 
-          <Typography
-            variant="h4"
-            fontWeight={700}
-            sx={{ mt: 1 }}
-          >
+          <Typography variant="h4" fontWeight={700} sx={{ mt: 1 }}>
             {count}
           </Typography>
         </Box>
@@ -346,16 +381,12 @@ function Interviews() {
       </Box>
 
       {error && (
-        <Alert
-          severity="error"
-          sx={{ mb: 2 }}
-          onClose={() => setError("")}
-        >
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError("")}>
           {error}
         </Alert>
       )}
 
-      {/* Day 22: Interview statistics */}
+      {/* Interview statistics */}
       <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>
         Interview Overview
       </Typography>
@@ -403,10 +434,10 @@ function Interviews() {
         )}
       </Box>
 
-      {/* Search and filters */}
+      {/* Search, filters, and sorting */}
       <Paper variant="outlined" sx={{ p: 2, mb: 3, borderRadius: 2 }}>
         <Typography variant="h6" fontWeight={600} sx={{ mb: 2 }}>
-          Search and Filter Interviews
+          Search, Filter and Sort Interviews
         </Typography>
 
         <Box
@@ -415,7 +446,8 @@ function Interviews() {
             gridTemplateColumns: {
               xs: "1fr",
               sm: "repeat(2, minmax(0, 1fr))",
-              md: "2fr 1fr 1fr auto",
+              md: "repeat(2, minmax(0, 1fr))",
+              lg: "2fr repeat(3, minmax(140px, 1fr)) auto",
             },
             gap: 2,
             alignItems: "center",
@@ -468,6 +500,20 @@ function Interviews() {
                 {type}
               </MenuItem>
             ))}
+          </TextField>
+
+          <TextField
+            select
+            fullWidth
+            size="small"
+            label="Sort by"
+            value={sortOrder}
+            onChange={(event) => setSortOrder(event.target.value)}
+          >
+            <MenuItem value="date-asc">Upcoming first</MenuItem>
+            <MenuItem value="date-desc">Latest first</MenuItem>
+            <MenuItem value="name-asc">Candidate A–Z</MenuItem>
+            <MenuItem value="name-desc">Candidate Z–A</MenuItem>
           </TextField>
 
           <Button
@@ -537,10 +583,7 @@ function Interviews() {
                       </Typography>
 
                       {interview.candidateEmail && (
-                        <Typography
-                          variant="body2"
-                          color="text.secondary"
-                        >
+                        <Typography variant="body2" color="text.secondary">
                           {interview.candidateEmail}
                         </Typography>
                       )}
@@ -617,11 +660,7 @@ function Interviews() {
         </TableContainer>
       )}
 
-      <Typography
-        variant="body2"
-        color="text.secondary"
-        sx={{ mt: 2 }}
-      >
+      <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
         Interview changes are saved locally in this browser. They do not send
         emails or notify candidates.
       </Typography>
@@ -655,9 +694,7 @@ function Interviews() {
         </DialogContent>
 
         <DialogActions>
-          <Button onClick={() => setSelectedInterview(null)}>
-            Go Back
-          </Button>
+          <Button onClick={() => setSelectedInterview(null)}>Go Back</Button>
 
           <Button
             color={
