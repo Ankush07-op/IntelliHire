@@ -297,3 +297,51 @@ def test_experience_not_required():
     assert result.required_experience_years is None
     assert result.candidate_experience_years == 1.5
     assert result.experience_match == "not_required"
+
+    
+from app.llm_matcher import normalize_skill, normalize_skill_list
+
+
+def test_normalize_javascript_alias():
+    assert normalize_skill("JS") == "javascript"
+    assert normalize_skill("JavaScript") == "javascript"
+
+
+def test_normalize_react_alias():
+    assert normalize_skill("React") == "react.js"
+    assert normalize_skill("React.js") == "react.js"
+
+
+def test_normalize_node_and_express_aliases():
+    assert normalize_skill("Node") == "node.js"
+    assert normalize_skill("Express") == "express.js"
+
+
+def test_normalize_mongodb_alias():
+    assert normalize_skill("Mongo DB") == "mongodb"
+    assert normalize_skill("MongoDB") == "mongodb"
+
+
+def test_normalize_postgresql_alias():
+    assert normalize_skill("Postgres") == "postgresql"
+    assert normalize_skill("PostgreSQL") == "postgresql"
+
+
+def test_normalize_skill_list_removes_duplicates():
+    skills = ["JS", "JavaScript", "SQL", "SQL"]
+
+    assert normalize_skill_list(skills) == [
+        "javascript",
+        "SQL",
+    ]
+
+
+def test_normalize_skill_preserves_display_capitalization():
+    assert normalize_skill("Power BI") == "Power BI"
+    assert normalize_skill("Data Analysis") == "Data Analysis"
+
+
+def test_normalize_skill_list_ignores_empty_values():
+    skills = ["SQL", "", "  ", "SQL"]
+
+    assert normalize_skill_list(skills) == ["SQL"]
