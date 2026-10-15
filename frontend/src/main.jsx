@@ -1,15 +1,15 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "@mui/material/styles";
 
 import App from "./App";
 import theme from "./theme/theme";
-import { AuthProvider } from "./context/AuthContext";
+import queryClient from "./queryClient";
+import { AuthProvider } from "./context/AuthContext.jsx";
+import { ToastProvider } from "./context/ToastContext.jsx";
 import "./index.css";
-
-const queryClient = new QueryClient();
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
@@ -17,7 +17,9 @@ ReactDOM.createRoot(document.getElementById("root")).render(
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
           <AuthProvider>
-            <App />
+            <ToastProvider>
+              <App />
+            </ToastProvider>
           </AuthProvider>
         </BrowserRouter>
       </QueryClientProvider>
