@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+﻿import { useMemo, useState } from "react";
 
 
 import {
@@ -639,148 +639,81 @@ function Ranking() {
 
 
       {/* Page Header */}
-
-      <Stack
-
-        direction={{ xs: "column", md: "row" }}
-
-        justifyContent="space-between"
-
-        alignItems={{ xs: "flex-start", md: "center" }}
-
-        spacing={2}
-
-        sx={{ mb: 3 }}
-
-      >
-
-        <Box>
-
-          <Typography variant="h4" fontWeight={700}>
-
-            Candidate Ranking
-
-          </Typography>
-
-
-          <Typography color="text.secondary" sx={{ mt: 0.5 }}>
-
-            Compare candidates using AI-based matching scores and recruiter insights.
-
-          </Typography>
-
-        </Box>
-
-
-        <Stack
-
-          direction={{ xs: "column", sm: "row" }}
-
-          spacing={2}
-
-          sx={{ width: { xs: "100%", md: "auto" } }}
-
-        >
-
-          <Select
-
-            size="small"
-
-            value={sortBy}
-
-            onChange={(event) => setSortBy(event.target.value)}
-
-            sx={{ minWidth: 210 }}
-
-          >
-
-            <MenuItem value="score">Sort by Overall Score</MenuItem>
-
-            <MenuItem value="skills">Sort by Skills Match</MenuItem>
-
-            <MenuItem value="experience">Sort by Experience Match</MenuItem>
-
-          </Select>
-
-
-          <Select
-
-            size="small"
-
-            value={scoreFilter}
-
-            onChange={(event) => setScoreFilter(event.target.value)}
-
-            sx={{ minWidth: 210 }}
-
-          >
-
-            <MenuItem value="all">All Scores</MenuItem>
-
-            <MenuItem value="strong">85–100 — Strong</MenuItem>
-
-            <MenuItem value="good">70–84 — Good</MenuItem>
-
-            <MenuItem value="needsReview">Below 70 — Needs Review</MenuItem>
-
-          </Select>
-
-
-          <Select
-
-            size="small"
-
-            value={skillFilter}
-
-            onChange={(event) => setSkillFilter(event.target.value)}
-
-            sx={{ minWidth: 180 }}
-
-          >
-
-            <MenuItem value="all">All Skills</MenuItem>
-
-            <MenuItem value="react">React</MenuItem>
-
-            <MenuItem value="javascript">JavaScript</MenuItem>
-
-            <MenuItem value="html">HTML</MenuItem>
-
-            <MenuItem value="css">CSS</MenuItem>
-
-            <MenuItem value="node.js">Node.js</MenuItem>
-
-          </Select>
-
-
-          <Select
-
-            size="small"
-
-            value={experienceFilter}
-
-            onChange={(event) => setExperienceFilter(event.target.value)}
-
-            sx={{ minWidth: 180 }}
-
-          >
-
-            <MenuItem value="all">All Experience</MenuItem>
-
-            <MenuItem value="1plus">1+ Years</MenuItem>
-
-            <MenuItem value="2plus">2+ Years</MenuItem>
-
-            <MenuItem value="3plus">3+ Years</MenuItem>
-
-          </Select>
-
-        </Stack>
-
-      </Stack>
-
-
-      {/* Ranking Summary */}
+<Box sx={{ mb: 3 }}>
+  <Typography variant="h4" fontWeight={700}>
+    Candidate Ranking
+  </Typography>
+
+  <Typography color="text.secondary" sx={{ mt: 0.5 }}>
+    Compare candidates using AI-based matching scores and recruiter insights.
+  </Typography>
+
+  <Box
+    sx={{
+      display: "grid",
+      gridTemplateColumns: {
+        xs: "1fr",
+        sm: "repeat(2, minmax(0, 1fr))",
+        lg: "repeat(4, minmax(0, 1fr))",
+      },
+      gap: 2,
+      mt: 3,
+    }}
+  >
+    <Select
+      fullWidth
+      size="small"
+      value={sortBy}
+      onChange={(event) => setSortBy(event.target.value)}
+      sx={{ height: 48, minWidth: 0 }}
+    >
+      <MenuItem value="score">Sort by Overall Score</MenuItem>
+      <MenuItem value="skills">Sort by Skills Match</MenuItem>
+      <MenuItem value="experience">Sort by Experience Match</MenuItem>
+    </Select>
+
+    <Select
+      fullWidth
+      size="small"
+      value={scoreFilter}
+      onChange={(event) => setScoreFilter(event.target.value)}
+      sx={{ height: 48, minWidth: 0 }}
+    >
+      <MenuItem value="all">All Scores</MenuItem>
+      <MenuItem value="strong">85–100 — Strong</MenuItem>
+      <MenuItem value="good">70–84 — Good</MenuItem>
+      <MenuItem value="needsReview">Below 70 — Needs Review</MenuItem>
+    </Select>
+
+    <Select
+      fullWidth
+      size="small"
+      value={skillFilter}
+      onChange={(event) => setSkillFilter(event.target.value)}
+      sx={{ height: 48, minWidth: 0 }}
+    >
+      <MenuItem value="all">All Skills</MenuItem>
+      <MenuItem value="react">React</MenuItem>
+      <MenuItem value="javascript">JavaScript</MenuItem>
+      <MenuItem value="html">HTML</MenuItem>
+      <MenuItem value="css">CSS</MenuItem>
+      <MenuItem value="node.js">Node.js</MenuItem>
+    </Select>
+
+    <Select
+      fullWidth
+      size="small"
+      value={experienceFilter}
+      onChange={(event) => setExperienceFilter(event.target.value)}
+      sx={{ height: 48, minWidth: 0 }}
+    >
+      <MenuItem value="all">All Experience</MenuItem>
+      <MenuItem value="1plus">1+ Years</MenuItem>
+      <MenuItem value="2plus">2+ Years</MenuItem>
+      <MenuItem value="3plus">3+ Years</MenuItem>
+    </Select>
+  </Box>
+</Box>{/* Ranking Summary */}
 
 
       <Box
@@ -2043,7 +1976,7 @@ function Ranking() {
                   >
 
 
-                    85–100% AI match
+                    85â€“100% AI match
 
 
                   </Typography>
@@ -2154,7 +2087,7 @@ function Ranking() {
                   >
 
 
-                    70–84% AI match
+                    70â€“84% AI match
 
 
                   </Typography>
