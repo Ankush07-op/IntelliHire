@@ -1,3 +1,4 @@
+﻿import { useState } from "react";
 import { Box } from "@mui/material";
 import { Outlet } from "react-router-dom";
 
@@ -7,10 +8,30 @@ import Sidebar from "./Sidebar";
 const drawerWidth = 240;
 
 function MainLayout() {
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  const handleDrawerToggle = () => {
+    setMobileOpen((prev) => !prev);
+  };
+
+  const handleMobileClose = () => {
+    setMobileOpen(false);
+  };
+
   return (
-    <Box sx={{ display: "flex", minHeight: "100vh" }}>
-      <Navbar />
-      <Sidebar />
+    <Box
+      sx={{
+        display: "flex",
+        minHeight: "100vh",
+        backgroundColor: "background.default",
+      }}
+    >
+      <Navbar onDrawerToggle={handleDrawerToggle} />
+
+      <Sidebar
+        mobileOpen={mobileOpen}
+        onMobileClose={handleMobileClose}
+      />
 
       <Box
         component="main"
@@ -18,6 +39,8 @@ function MainLayout() {
           flexGrow: 1,
           minWidth: 0,
           width: { xs: "100%", md: `calc(100% - ${drawerWidth}px)` },
+          maxWidth: "100vw",
+          overflowX: "hidden",
           p: { xs: 2, sm: 3 },
           pt: { xs: 10, sm: 11 },
           minHeight: "100vh",

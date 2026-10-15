@@ -2,16 +2,23 @@ const Application = require('../models/Application');
 const Job = require('../models/Job');
 const { triggerAIAnalysis } = require('../services/aiService');
 const AIAnalysis = require('../models/AIAnalysis');
+const { sendStatusUpdateEmail, sendInterviewInviteEmail } = require('../services/emailService');
+const { uploadToCloudinary, getPresignedDownloadUrl } = require('../services/cloudinaryService');
 
 // @desc    Submit a new job application
 // @route   POST /api/applications
 // @access  Private (Applicant only)
 const applyForJob = async (req, res) => {
   try {
-    const { jobId, resumeUrl } = req.body;
+    const { jobId } = req.body;
+    const file = req.file; // Multer buffer
 
-    if (!jobId || !resumeUrl) {
-      return res.status(400).json({ message: 'Job ID and resume URL are required' });
+    if (!jobId) {
+      return res.status(400).json({ message: 'Job ID is required' });
+    }
+
+    if (!file) {
+      return res.status(400).json({ message: 'Please upload a resume file (PDF or DOCX)' });
     }
 
     // Verify job exists and is active
@@ -30,16 +37,20 @@ const applyForJob = async (req, res) => {
       return res.status(400).json({ message: 'You have already applied for this position' });
     }
 
+    // Upload file buffer to Cloudinary and get public ID
+    const publicId = await uploadToCloudinary(file);
+
+    // Save Application record in MongoDB
     const application = await Application.create({
       jobId,
       applicantId: req.user.id,
-      resumeUrl,
+      resumeUrl: publicId, // Storing Cloudinary public ID
     });
 
     // Trigger AI Analysis Asynchronously (Non-blocking)
     triggerAIAnalysis(
       application._id,
-      resumeUrl,
+      publicId,
       job.description,
       job.requiredSkills
     );
@@ -117,9 +128,134 @@ const getApplicationAnalysis = async (req, res) => {
   }
 };
 
+// @desc    Update application pipeline status & trigger email notification
+// @route   PATCH /api/applications/:id/status
+// @access  Private (Recruiter only)
+const updateApplicationStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, interviewDetails } = req.body;
+
+    const validStatuses = ['Applied', 'Shortlisted', 'Interview', 'Offered', 'Rejected'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ message: 'Invalid pipeline status' });
+    }
+
+    const application = await Application.findById(id)
+      .populate('applicantId', 'name email')
+      .populate('jobId', 'title recruiterId');
+
+    if (!application) {
+      return res.status(404).json({ message: 'Application not found' });
+    }
+
+    // Verify requesting recruiter owns the job
+    if (application.jobId.recruiterId.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'Not authorized to update this status' });
+    }
+
+    application.status = status;
+    await application.save();
+
+    // Trigger automated email notification (M2 logic)
+    if (status === 'Interview' && interviewDetails) {
+      await sendInterviewInviteEmail(
+        application.applicantId.email,
+        application.applicantId.name,
+        application.jobId.title,
+        interviewDetails
+      );
+    } else {
+      await sendStatusUpdateEmail(
+        application.applicantId.email,
+        application.applicantId.name,
+        application.jobId.title,
+        status
+      );
+    }
+
+    res.json({ message: 'Status updated successfully', application });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Get secure pre-signed resume download URL
+// @route   GET /api/applications/:id/resume
+// @access  Private (Applicant who owns resume OR Recruiter who owns job)
+const getResumeDownloadUrl = async (req, res) => {
+  try {
+    // Populate job details to perform recruiter ownership check
+    const application = await Application.findById(req.params.id)
+      .populate('jobId', 'recruiterId');
+
+    if (!application) {
+      return res.status(404).json({ message: 'Application not found' });
+    }
+
+    const userId = req.user.id;
+    const isApplicant = application.applicantId.toString() === userId;
+    const isJobOwnerRecruiter =
+      req.user.role === 'recruiter' &&
+      application.jobId.recruiterId.toString() === userId;
+
+    // Reject access if user is neither the candidate nor the hiring recruiter
+    if (!isApplicant && !isJobOwnerRecruiter) {
+      return res.status(403).json({
+        message: 'Not authorized to access this candidate document',
+      });
+    }
+
+    // Generate 15-minute expiring signed URLs from Cloudinary public ID
+    const inlineUrl = await getPresignedDownloadUrl(application.resumeUrl, true);
+    const downloadUrl = await getPresignedDownloadUrl(application.resumeUrl, false);
+
+    res.json({
+      downloadUrl,
+      viewUrl: inlineUrl,
+      expiresIn: 900, // 15 minutes in seconds
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Manually trigger re-parsing for an application
+// @route   POST /api/applications/:id/reanalyze
+// @access  Private (Recruiter only)
+const reanalyzeApplication = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const application = await Application.findById(id).populate('jobId');
+    if (!application) {
+      return res.status(404).json({ message: 'Application not found' });
+    }
+
+    if (application.jobId.recruiterId.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'Not authorized for this operation' });
+    }
+
+    // Trigger AI background worker again
+    triggerAIAnalysis(
+      application._id,
+      application.resumeUrl,
+      application.jobId.description,
+      application.jobId.requiredSkills
+    );
+
+    res.json({ message: 'Re-analysis triggered successfully' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   applyForJob,
   getApplicationsByJob,
   getMyApplications,
   getApplicationAnalysis,
+  updateApplicationStatus,
+  getResumeDownloadUrl,
+  reanalyzeApplication,
 };
