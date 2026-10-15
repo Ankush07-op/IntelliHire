@@ -1,4 +1,9 @@
-from fastapi import FastAPI, File, HTTPException, UploadFile
+
+import os
+import tempfile
+from pathlib import Path
+
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 
 from app.llm_matcher import (
     extract_skills_with_gemini,
@@ -13,6 +18,25 @@ app = FastAPI(
     version="1.0.0",
 )
 
+ALLOWED_EXTENSIONS = {".pdf", ".docx"}
+
+
+def validate_resume_filename(filename: str | None) -> None:
+    """Validate that a resume has a supported file extension."""
+    if not filename:
+        raise HTTPException(
+            status_code=400,
+            detail="Resume file is required.",
+        )
+
+    extension = Path(filename).suffix.lower()
+
+    if extension not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail="Only PDF and DOCX resume files are supported.",
+        )
+
 
 @app.get("/health")
 def health_check():
@@ -24,31 +48,21 @@ def health_check():
 
 @app.post("/api/resume/parse")
 async def parse_resume_endpoint(file: UploadFile = File(...)):
-    if not file.filename:
-        raise HTTPException(
-            status_code=400,
-            detail="Resume file is required.",
-        )
+    validate_resume_filename(file.filename)
 
-    allowed_extensions = {".pdf", ".docx"}
-
-    filename = file.filename.lower()
-
-    if not any(
-        filename.endswith(extension)
-        for extension in allowed_extensions
-    ):
-        raise HTTPException(
-            status_code=400,
-            detail="Only PDF and DOCX resume files are supported.",
-        )
-
-    temp_file = f"temp_{file.filename}"
+    temp_file = None
 
     try:
-        content = await file.read()
+        suffix = Path(file.filename).suffix.lower()
 
-        with open(temp_file, "wb") as output_file:
+        with tempfile.NamedTemporaryFile(
+            mode="wb",
+            suffix=suffix,
+            prefix="intellihire_resume_",
+            delete=False,
+        ) as output_file:
+            temp_file = output_file.name
+            content = await file.read()
             output_file.write(content)
 
         result = parse_resume(temp_file)
@@ -72,39 +86,29 @@ async def parse_resume_endpoint(file: UploadFile = File(...)):
         ) from exc
 
     finally:
-        import os
+        await file.close()
 
-        if os.path.exists(temp_file):
+        if temp_file and os.path.exists(temp_file):
             os.remove(temp_file)
 
 
 @app.post("/api/resume/ai-extract")
 async def ai_extract_resume_skills(file: UploadFile = File(...)):
-    if not file.filename:
-        raise HTTPException(
-            status_code=400,
-            detail="Resume file is required.",
-        )
+    validate_resume_filename(file.filename)
 
-    allowed_extensions = {".pdf", ".docx"}
-
-    filename = file.filename.lower()
-
-    if not any(
-        filename.endswith(extension)
-        for extension in allowed_extensions
-    ):
-        raise HTTPException(
-            status_code=400,
-            detail="Only PDF and DOCX resume files are supported.",
-        )
-
-    temp_file = f"temp_{file.filename}"
+    temp_file = None
 
     try:
-        content = await file.read()
+        suffix = Path(file.filename).suffix.lower()
 
-        with open(temp_file, "wb") as output_file:
+        with tempfile.NamedTemporaryFile(
+            mode="wb",
+            suffix=suffix,
+            prefix="intellihire_resume_",
+            delete=False,
+        ) as output_file:
+            temp_file = output_file.name
+            content = await file.read()
             output_file.write(content)
 
         parsed_resume = parse_resume(temp_file)
@@ -138,22 +142,18 @@ async def ai_extract_resume_skills(file: UploadFile = File(...)):
         ) from exc
 
     finally:
-        import os
+        await file.close()
 
-        if os.path.exists(temp_file):
+        if temp_file and os.path.exists(temp_file):
             os.remove(temp_file)
 
 
 @app.post("/api/resume/match")
 async def match_resume_endpoint(
     file: UploadFile = File(...),
-    job_description: str = "",
+    job_description: str = Form(...),
 ):
-    if not file.filename:
-        raise HTTPException(
-            status_code=400,
-            detail="Resume file is required.",
-        )
+    validate_resume_filename(file.filename)
 
     if not job_description.strip():
         raise HTTPException(
@@ -161,25 +161,19 @@ async def match_resume_endpoint(
             detail="Job description is required.",
         )
 
-    allowed_extensions = {".pdf", ".docx"}
-
-    filename = file.filename.lower()
-
-    if not any(
-        filename.endswith(extension)
-        for extension in allowed_extensions
-    ):
-        raise HTTPException(
-            status_code=400,
-            detail="Only PDF and DOCX resume files are supported.",
-        )
-
-    temp_file = f"temp_{file.filename}"
+    temp_file = None
 
     try:
-        content = await file.read()
+        suffix = Path(file.filename).suffix.lower()
 
-        with open(temp_file, "wb") as output_file:
+        with tempfile.NamedTemporaryFile(
+            mode="wb",
+            suffix=suffix,
+            prefix="intellihire_resume_",
+            delete=False,
+        ) as output_file:
+            temp_file = output_file.name
+            content = await file.read()
             output_file.write(content)
 
         parsed_resume = parse_resume(temp_file)
@@ -214,7 +208,7 @@ async def match_resume_endpoint(
         ) from exc
 
     finally:
-        import os
+        await file.close()
 
-        if os.path.exists(temp_file):
+        if temp_file and os.path.exists(temp_file):
             os.remove(temp_file)

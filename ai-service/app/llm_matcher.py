@@ -1,5 +1,7 @@
+
 import json
 import os
+import re
 
 from dotenv import load_dotenv
 from google import genai
@@ -35,23 +37,17 @@ def get_gemini_client():
     api_key = os.getenv("GEMINI_API_KEY")
 
     if not api_key:
-        raise RuntimeError(
-            "GEMINI_API_KEY is not configured."
-        )
+        raise RuntimeError("GEMINI_API_KEY is not configured.")
 
     return genai.Client(api_key=api_key)
 
 
-def extract_skills_with_gemini(
-    resume_text: str,
-) -> dict:
+def extract_skills_with_gemini(resume_text: str) -> dict:
     """
     Extract resume skills using Gemini structured output.
 
     Returns:
-        {
-            "skills": [...]
-        }
+        {"skills": [...]}
     """
     if not resume_text or not resume_text.strip():
         raise ValueError("Resume text is required.")
@@ -79,9 +75,7 @@ def extract_skills_with_gemini(
     raw_output = response.text
 
     if not raw_output:
-        raise ValueError(
-            "Gemini returned an empty response."
-        )
+        raise ValueError("Gemini returned an empty response.")
 
     try:
         parsed_output = json.loads(raw_output)
@@ -130,6 +124,57 @@ class ResumeMatchResponse(BaseModel):
     summary: str
 
 
+# Normalize common aliases without merging unrelated technologies.
+SKILL_ALIASES = {
+    "js": "javascript",
+    "javascript": "javascript",
+    "react": "react.js",
+    "react.js": "react.js",
+    "node": "node.js",
+    "node.js": "node.js",
+    "express": "express.js",
+    "express.js": "express.js",
+    "mongo db": "mongodb",
+    "mongodb": "mongodb",
+    "postgres": "postgresql",
+    "postgresql": "postgresql",
+    "html5": "html",
+    "html": "html",
+    "css3": "css",
+    "css": "css",
+    "excel": "microsoft excel",
+    "microsoft excel": "microsoft excel",
+}
+
+
+
+def normalize_skill(skill: str) -> str:
+    """Normalize aliases while preserving original display capitalization."""
+    cleaned = re.sub(r"\s+", " ", skill.strip())
+    lookup_key = cleaned.lower()
+
+    return SKILL_ALIASES.get(lookup_key, cleaned)
+
+
+
+def normalize_skill_list(skills: list[str]) -> list[str]:
+    """Normalize skill names and remove duplicates while preserving order."""
+    normalized = []
+    seen = set()
+
+    for skill in skills:
+        if not isinstance(skill, str):
+            continue
+
+        value = normalize_skill(skill)
+
+        if value and value not in seen:
+            normalized.append(value)
+            seen.add(value)
+
+    return normalized
+
+
 RESUME_MATCH_PROMPT = """
 You are the IntelliHire AI candidate-job matching engine.
 
@@ -146,9 +191,7 @@ Evaluate the candidate using these factors:
 6. Candidate's demonstrated years of experience
 7. Overall alignment with the job requirements
 
-
 IMPORTANT MATCHING RULES:
-
 
 1. Evidence-based evaluation
 
@@ -160,7 +203,6 @@ IMPORTANT MATCHING RULES:
 - Do not treat a job requirement as evidence that the candidate has that
   skill.
 
-
 2. Matched skills
 
 - Include important skills from the job description that are explicitly
@@ -171,7 +213,6 @@ IMPORTANT MATCHING RULES:
 - Do not include job titles, company names, education degrees, or generic
   resume section headings as skills.
 
-
 3. Missing skills
 
 - Include important skills explicitly required or strongly preferred by
@@ -180,7 +221,6 @@ IMPORTANT MATCHING RULES:
 - Do not list a skill as missing when the resume clearly demonstrates the
   same skill using an equivalent common name.
 - Keep the list focused on meaningful gaps.
-
 
 4. Required versus optional skills
 
@@ -191,7 +231,6 @@ IMPORTANT MATCHING RULES:
 - A candidate should not receive a very low score solely because of
   missing optional skills.
 
-
 5. Equivalent skills
 
 - Recognize common equivalent names and abbreviations when their meaning
@@ -200,14 +239,12 @@ IMPORTANT MATCHING RULES:
 - Do not merge unrelated technologies merely because they belong to the
   same category.
 
-
 6. Experience requirement extraction
 
 Identify the minimum or primary years of experience explicitly stated in
 the job description.
 
 Examples:
-
 - "2+ years of experience" -> 2
 - "At least 3 years of experience" -> 3
 - "Minimum 5 years experience" -> 5
@@ -216,7 +253,6 @@ Examples:
 
 If the job description does not clearly specify a required number of years,
 return null for required_experience_years.
-
 
 7. Candidate experience evaluation
 
@@ -232,7 +268,6 @@ Do not invent employment dates or experience.
 If the resume does not provide enough evidence to determine years of
 experience, return null for candidate_experience_years.
 
-
 8. Experience match
 
 Return exactly one of these values:
@@ -244,7 +279,6 @@ Return exactly one of these values:
   required
 - "not_required" -> job does not specify an experience requirement
 - "unknown" -> experience cannot be reliably determined
-
 
 9. Match score
 
@@ -270,12 +304,11 @@ Return exactly one of these values:
 
 Use this general interpretation:
 
-    90-100 = Excellent match
-    75-89  = Strong match
-    60-74  = Moderate match
-    40-59  = Weak match
-    0-39   = Poor match
-
+90-100 = Excellent match
+75-89  = Strong match
+60-74  = Moderate match
+40-59  = Weak match
+0-39   = Poor match
 
 10. Summary
 
@@ -287,13 +320,11 @@ Use this general interpretation:
 - Do not make decisions based on name, gender, age, photo, nationality,
   religion, address, or other personal characteristics.
 
-
 11. Output
 
 Return only the required structured JSON output.
 
 The final response must contain:
-
 - match_score
 - matched_skills
 - missing_skills
@@ -311,16 +342,7 @@ def match_resume_with_gemini(
     """
     Compare a resume against a job description using Gemini.
 
-    Returns:
-        {
-            "match_score": 0-100,
-            "matched_skills": [...],
-            "missing_skills": [...],
-            "required_experience_years": float | None,
-            "candidate_experience_years": float | None,
-            "experience_match": "...",
-            "summary": "..."
-        }
+    Returns a validated matching result with normalized skill names.
     """
     if not resume_text or not resume_text.strip():
         raise ValueError("Resume text is required.")
@@ -353,9 +375,7 @@ def match_resume_with_gemini(
     raw_output = response.text
 
     if not raw_output:
-        raise ValueError(
-            "Gemini returned an empty response."
-        )
+        raise ValueError("Gemini returned an empty response.")
 
     try:
         parsed_output = json.loads(raw_output)
@@ -373,4 +393,21 @@ def match_resume_with_gemini(
             f"AI match response failed schema validation: {exc}"
         ) from exc
 
-    return validated.model_dump()
+    result = validated.model_dump()
+
+    result["matched_skills"] = normalize_skill_list(
+        result["matched_skills"]
+    )
+    result["missing_skills"] = normalize_skill_list(
+        result["missing_skills"]
+    )
+
+    matched = set(result["matched_skills"])
+
+    result["missing_skills"] = [
+        skill
+        for skill in result["missing_skills"]
+        if skill not in matched
+    ]
+
+    return result
