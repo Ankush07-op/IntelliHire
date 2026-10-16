@@ -13,22 +13,24 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  Divider,
   FormControl,
   Grid,
   InputAdornment,
+  InputLabel,
   LinearProgress,
   MenuItem,
   OutlinedInput,
   Paper,
   Select,
   Skeleton,
+  Stack,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
   TableRow,
+  Tooltip,
   Typography,
 } from "@mui/material";
 
@@ -41,6 +43,7 @@ import FileDownloadIcon from "@mui/icons-material/FileDownload";
 import SearchIcon from "@mui/icons-material/Search";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
+import FilterListOffIcon from "@mui/icons-material/FilterListOff";
 
 import { useAuth } from "../../context/useAuth";
 import { fetchJobs } from "../../services/jobService";
@@ -52,6 +55,20 @@ import {
 import { formatDate } from "../../utils/formatDate";
 
 const MEDAL_COLORS = ["#F59E0B", "#94A3B8", "#D97706"];
+
+const getScoreColor = (score) => {
+  if (score === null || score === undefined) return "default";
+  if (score >= 80) return "success";
+  if (score >= 60) return "warning";
+  return "error";
+};
+
+const getScoreCategoryLabel = (score) => {
+  if (score === null || score === undefined) return "Pending";
+  if (score >= 80) return "Strong";
+  if (score >= 60) return "Medium";
+  return "Weak";
+};
 
 function Ranking() {
   const { user } = useAuth();
@@ -67,15 +84,20 @@ function Ranking() {
   const [reanalyzing, setReanalyzing] = useState(null);
   const { showToast } = useToast();
 
-  // Superpower states: search, filter chips, and comparison modal
+  // Filters & Sorting state
   const [candidateSearch, setCandidateSearch] = useState("");
-  const [scoreFilter, setScoreFilter] = useState("all"); // 'all' | '80' | '60' | 'below60'
+  const [sortBy, setSortBy] = useState("score"); // 'score' | 'skills' | 'experience'
+  const [scoreFilter, setScoreFilter] = useState("all"); // 'all' | 'strong' | 'medium' | 'weak'
+  const [skillFilter, setSkillFilter] = useState("all");
+  const [experienceFilter, setExperienceFilter] = useState("all"); // 'all' | '1plus' | '2plus' | '3plus' | '5plus'
+
+  // Modal inspection state
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [selectedCandidate, setSelectedCandidate] = useState(null);
 
-  const showSnackbar = (msg, sev = "success") => {
+  const showSnackbar = useCallback((msg, sev = "success") => {
     showToast(msg, sev);
-  };
+  }, [showToast]);
 
   // ── Load recruiter's jobs ────────────────────────────────
   useEffect(() => {
@@ -135,7 +157,7 @@ function Ranking() {
         }
       });
 
-      const enriched = applications
+      const enriched = (Array.isArray(applications) ? applications : [])
         .map((app) => {
           const analysis = rankedMap.get(app._id?.toString());
           return {
@@ -182,26 +204,128 @@ function Ranking() {
     }
   };
 
+  const selectedJob = jobs.find((j) => j._id === selectedJobId);
+
+  // ── Dynamic Skills available for the selected job & applicants ──
+  const availableSkills = useMemo(() => {
+    const set = new Set();
+    if (Array.isArray(selectedJob?.requiredSkills)) {
+      selectedJob.requiredSkills.forEach((s) => {
+        const trimmed = typeof s === "string" ? s.trim() : "";
+        if (trimmed) set.add(trimmed);
+      });
+    }
+    ranked.forEach((app) => {
+      if (Array.isArray(app.matchedSkills)) {
+        app.matchedSkills.forEach((s) => {
+          const trimmed = typeof s === "string" ? s.trim() : "";
+          if (trimmed) set.add(trimmed);
+        });
+      }
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [selectedJob, ranked]);
+
+  // ── Filtered candidates ──────────────────────────────────
+  const filteredRanked = useMemo(() => {
+    return ranked.filter((app) => {
+      // Score filter: Strong ≥80%, Medium 60-79%, Weak <60%
+      if (scoreFilter === "strong" && (app.matchScore === null || app.matchScore < 80)) return false;
+      if (scoreFilter === "medium" && (app.matchScore === null || app.matchScore < 60 || app.matchScore >= 80)) return false;
+      if (scoreFilter === "weak" && (app.matchScore === null || app.matchScore >= 60)) return false;
+
+      // Skill filter
+      if (skillFilter !== "all") {
+        const target = skillFilter.toLowerCase();
+        const hasSkill = (app.matchedSkills || []).some(
+          (s) => typeof s === "string" && s.toLowerCase().includes(target)
+        );
+        if (!hasSkill) return false;
+      }
+
+      // Experience filter
+      if (experienceFilter === "1plus" && (app.experienceYears ?? 0) < 1) return false;
+      if (experienceFilter === "2plus" && (app.experienceYears ?? 0) < 2) return false;
+      if (experienceFilter === "3plus" && (app.experienceYears ?? 0) < 3) return false;
+      if (experienceFilter === "5plus" && (app.experienceYears ?? 0) < 5) return false;
+
+      // Text query
+      if (candidateSearch.trim()) {
+        const q = candidateSearch.toLowerCase();
+        const name = (app.applicantId?.name || "").toLowerCase();
+        const email = (app.applicantId?.email || "").toLowerCase();
+        const skills = (app.matchedSkills || []).join(" ").toLowerCase();
+        if (!name.includes(q) && !email.includes(q) && !skills.includes(q)) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [ranked, scoreFilter, skillFilter, experienceFilter, candidateSearch]);
+
+  // ── Sorted candidates ────────────────────────────────────
+  const sortedRanked = useMemo(() => {
+    const list = [...filteredRanked];
+    list.sort((a, b) => {
+      if (sortBy === "skills") {
+        const countA = a.matchedSkills?.length || 0;
+        const countB = b.matchedSkills?.length || 0;
+        if (countB !== countA) return countB - countA;
+        return (b.matchScore ?? 0) - (a.matchScore ?? 0);
+      }
+      if (sortBy === "experience") {
+        const expA = a.experienceYears ?? 0;
+        const expB = b.experienceYears ?? 0;
+        if (expB !== expA) return expB - expA;
+        return (b.matchScore ?? 0) - (a.matchScore ?? 0);
+      }
+      // Default: 'score'
+      if (a.matchScore === null && b.matchScore === null) return 0;
+      if (a.matchScore === null) return 1;
+      if (b.matchScore === null) return -1;
+      return b.matchScore - a.matchScore;
+    });
+    return list;
+  }, [filteredRanked, sortBy]);
+
+  const isFilterActive =
+    sortBy !== "score" ||
+    scoreFilter !== "all" ||
+    skillFilter !== "all" ||
+    experienceFilter !== "all" ||
+    candidateSearch.trim() !== "";
+
+  const handleResetFilters = () => {
+    setSortBy("score");
+    setScoreFilter("all");
+    setSkillFilter("all");
+    setExperienceFilter("all");
+    setCandidateSearch("");
+  };
+
   // ── Export CSV Superpower ───────────────────────────────
   const handleExportCSV = () => {
-    if (ranked.length === 0) return;
+    if (sortedRanked.length === 0) return;
     const currentJob = jobs.find((j) => j._id === selectedJobId);
     const headers = [
       "Rank",
       "Candidate Name",
       "Email",
       "Match Score (%)",
+      "Match Category",
       "Experience (Years)",
       "Matched Skills",
       "Missing Skills",
       "Pipeline Status",
       "Applied Date",
     ];
-    const rows = ranked.map((app, idx) => [
+    const rows = sortedRanked.map((app, idx) => [
       `#${idx + 1}`,
       `"${(app.applicantId?.name || "Unknown").replace(/"/g, '""')}"`,
       `"${(app.applicantId?.email || "").replace(/"/g, '""')}"`,
       app.matchScore ?? "Pending",
+      getScoreCategoryLabel(app.matchScore),
       app.experienceYears ?? "N/A",
       `"${(app.matchedSkills || []).join(", ").replace(/"/g, '""')}"`,
       `"${(app.missingSkills || []).join(", ").replace(/"/g, '""')}"`,
@@ -225,38 +349,8 @@ function Ranking() {
     showSnackbar("CSV ranking export downloaded successfully.");
   };
 
-  // ── Filtered candidates ──────────────────────────────────
-  const filteredRanked = useMemo(() => {
-    return ranked.filter((app) => {
-      // Score filter
-      if (scoreFilter === "80" && (app.matchScore === null || app.matchScore < 80)) return false;
-      if (scoreFilter === "60" && (app.matchScore === null || app.matchScore < 60 || app.matchScore >= 80)) return false;
-      if (scoreFilter === "below60" && (app.matchScore === null || app.matchScore >= 60)) return false;
-
-      // Text query
-      if (candidateSearch.trim()) {
-        const q = candidateSearch.toLowerCase();
-        const name = app.applicantId?.name?.toLowerCase() || "";
-        const email = app.applicantId?.email?.toLowerCase() || "";
-        const skills = (app.matchedSkills || []).join(" ").toLowerCase();
-        if (!name.includes(q) && !email.includes(q) && !skills.includes(q)) {
-          return false;
-        }
-      }
-
-      return true;
-    });
-  }, [ranked, scoreFilter, candidateSearch]);
-
   const candidateName = (app) => app.applicantId?.name || "Unknown Candidate";
   const candidateEmail = (app) => app.applicantId?.email || "—";
-
-  const getScoreColor = (score) => {
-    if (score === null) return "default";
-    if (score >= 80) return "success";
-    if (score >= 50) return "warning";
-    return "error";
-  };
 
   const initials = (name) =>
     name
@@ -267,18 +361,17 @@ function Ranking() {
       .toUpperCase();
 
   const top3 = ranked.slice(0, 3);
-  const selectedJob = jobs.find((j) => j._id === selectedJobId);
 
   return (
     <Box sx={{ pb: 6 }}>
-      {/* ── Page Header ── */}
+      {/* ── Dedicated Page Header Row ── */}
       <Box
         sx={{
           display: "flex",
           justifyContent: "space-between",
-          alignItems: { xs: "flex-start", md: "center" },
-          mb: 4,
-          flexWrap: "wrap",
+          alignItems: { xs: "flex-start", sm: "center" },
+          flexDirection: { xs: "column", sm: "row" },
+          mb: 3,
           gap: 2,
         }}
       >
@@ -286,18 +379,19 @@ function Ranking() {
           <Typography variant="h4" fontWeight={800} sx={{ letterSpacing: "-0.03em" }}>
             Candidate Rankings
           </Typography>
-          <Typography variant="body1" color="text.secondary">
-            AI-driven semantic skill matching and candidate podium ranking.
+          <Typography variant="body1" color="text.secondary" sx={{ mt: 0.5 }}>
+            Compare candidates using AI-based matching scores and recruiter insights.
           </Typography>
         </Box>
 
-        <Box sx={{ display: "flex", gap: 1.5, alignItems: "center", flexWrap: "wrap" }}>
+        <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap">
           {selectedJobId !== "all" && ranked.length > 0 && (
             <Button
               variant="outlined"
+              size="small"
               startIcon={<FileDownloadIcon />}
               onClick={handleExportCSV}
-              sx={{ fontWeight: 600 }}
+              sx={{ fontWeight: 600, height: 38 }}
             >
               Export CSV
             </Button>
@@ -305,32 +399,180 @@ function Ranking() {
 
           <Button
             variant="outlined"
+            size="small"
             startIcon={<RefreshIcon />}
             disabled={selectedJobId === "all" || loading}
             onClick={fetchRanking}
-            sx={{ fontWeight: 600 }}
+            sx={{ fontWeight: 600, height: 38 }}
           >
             Refresh
           </Button>
-
-          <FormControl size="small" sx={{ minWidth: 260 }} disabled={jobsLoading}>
-            <Select
-              value={selectedJobId}
-              onChange={(e) => setSelectedJobId(e.target.value)}
-              displayEmpty
-              sx={{ backgroundColor: "#FFF" }}
-            >
-              <MenuItem value="all">— Select an Opening —</MenuItem>
-              {jobs.map((job) => (
-                <MenuItem key={job._id} value={job._id}>
-                  {job.title}
-                  {job.status === "archived" && " (Archived)"}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        </Box>
+        </Stack>
       </Box>
+
+      {/* ── Dedicated Responsive Filter Controls Row ── */}
+      <Card
+        sx={{
+          mb: 3,
+          borderRadius: "16px",
+          border: "1px solid #E2E8F0",
+          boxShadow: "0 1px 3px 0 rgba(15, 23, 42, 0.05)",
+          backgroundColor: "#FFFFFF",
+        }}
+      >
+        <CardContent sx={{ p: 2.5, "&:last-child": { pb: 2.5 } }}>
+          <Grid container spacing={2} alignItems="center">
+            {/* 1. Job Opening Selector */}
+            <Grid item xs={12} sm={6} md={3}>
+              <FormControl fullWidth size="small" disabled={jobsLoading}>
+                <InputLabel id="ranking-job-select-label">Job Opening</InputLabel>
+                <Select
+                  labelId="ranking-job-select-label"
+                  id="ranking-job-select"
+                  value={selectedJobId}
+                  label="Job Opening"
+                  onChange={(e) => setSelectedJobId(e.target.value)}
+                >
+                  <MenuItem value="all">— Select an Opening —</MenuItem>
+                  {jobs.map((job) => (
+                    <MenuItem key={job._id} value={job._id}>
+                      {job.title}
+                      {job.status === "archived" && " (Archived)"}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+
+            {/* 2. Sort By */}
+            <Grid item xs={12} sm={6} md={2.25}>
+              <FormControl fullWidth size="small" disabled={selectedJobId === "all"}>
+                <InputLabel id="ranking-sort-select-label">Sort By</InputLabel>
+                <Select
+                  labelId="ranking-sort-select-label"
+                  id="ranking-sort-select"
+                  value={sortBy}
+                  label="Sort By"
+                  onChange={(e) => setSortBy(e.target.value)}
+                >
+                  <MenuItem value="score">Overall Score</MenuItem>
+                  <MenuItem value="skills">Skills Match</MenuItem>
+                  <MenuItem value="experience">Experience Match</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+
+            {/* 3. Score Category Filter */}
+            <Grid item xs={12} sm={6} md={2.25}>
+              <FormControl fullWidth size="small" disabled={selectedJobId === "all"}>
+                <InputLabel id="ranking-score-select-label">Match Category</InputLabel>
+                <Select
+                  labelId="ranking-score-select-label"
+                  id="ranking-score-select"
+                  value={scoreFilter}
+                  label="Match Category"
+                  onChange={(e) => setScoreFilter(e.target.value)}
+                >
+                  <MenuItem value="all">All Scores</MenuItem>
+                  <MenuItem value="strong">Strong (≥80%)</MenuItem>
+                  <MenuItem value="medium">Medium (60–79%)</MenuItem>
+                  <MenuItem value="weak">Weak (&lt;60%)</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+
+            {/* 4. Skills Filter */}
+            <Grid item xs={12} sm={6} md={2.25}>
+              <FormControl fullWidth size="small" disabled={selectedJobId === "all"}>
+                <InputLabel id="ranking-skill-select-label">Skill</InputLabel>
+                <Select
+                  labelId="ranking-skill-select-label"
+                  id="ranking-skill-select"
+                  value={skillFilter}
+                  label="Skill"
+                  onChange={(e) => setSkillFilter(e.target.value)}
+                >
+                  <MenuItem value="all">All Skills</MenuItem>
+                  {availableSkills.map((skill) => (
+                    <MenuItem key={skill} value={skill}>
+                      {skill}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+
+            {/* 5. Experience Filter */}
+            <Grid item xs={12} sm={6} md={2.25}>
+              <FormControl fullWidth size="small" disabled={selectedJobId === "all"}>
+                <InputLabel id="ranking-exp-select-label">Experience</InputLabel>
+                <Select
+                  labelId="ranking-exp-select-label"
+                  id="ranking-exp-select"
+                  value={experienceFilter}
+                  label="Experience"
+                  onChange={(e) => setExperienceFilter(e.target.value)}
+                >
+                  <MenuItem value="all">All Experience</MenuItem>
+                  <MenuItem value="1plus">1+ Years</MenuItem>
+                  <MenuItem value="2plus">2+ Years</MenuItem>
+                  <MenuItem value="3plus">3+ Years</MenuItem>
+                  <MenuItem value="5plus">5+ Years</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+          </Grid>
+
+          {/* Sub-row for Keyword Search and Filter Reset */}
+          {selectedJobId !== "all" && (
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                flexWrap: "wrap",
+                gap: 1.5,
+                mt: 2,
+                pt: 2,
+                borderTop: "1px solid #F1F5F9",
+              }}
+            >
+              <OutlinedInput
+                size="small"
+                placeholder="Search candidate name, email, or skill..."
+                value={candidateSearch}
+                onChange={(e) => setCandidateSearch(e.target.value)}
+                startAdornment={
+                  <InputAdornment position="start">
+                    <SearchIcon sx={{ color: "text.secondary", fontSize: 18 }} />
+                  </InputAdornment>
+                }
+                sx={{ minWidth: { xs: "100%", sm: 320 }, height: 38 }}
+              />
+
+              <Stack direction="row" spacing={1} alignItems="center">
+                <Typography variant="caption" color="text.secondary">
+                  Showing <strong>{sortedRanked.length}</strong> of {ranked.length} candidates
+                </Typography>
+                {isFilterActive && (
+                  <Tooltip title="Reset all search and filter controls">
+                    <Button
+                      size="small"
+                      color="inherit"
+                      variant="text"
+                      startIcon={<FilterListOffIcon fontSize="small" />}
+                      onClick={handleResetFilters}
+                      sx={{ textTransform: "none", fontSize: "0.8rem", color: "text.secondary" }}
+                    >
+                      Clear Filters
+                    </Button>
+                  </Tooltip>
+                )}
+              </Stack>
+            </Box>
+          )}
+        </CardContent>
+      </Card>
 
       {fetchError && (
         <Alert severity="error" sx={{ mb: 3 }} onClose={() => setFetchError("")}>
@@ -414,7 +656,11 @@ function Ranking() {
                         </Box>
 
                         <Chip
-                          label={app.matchScore !== null ? `${app.matchScore}% Match` : "Pending"}
+                          label={
+                            app.matchScore !== null
+                              ? `${app.matchScore}% · ${getScoreCategoryLabel(app.matchScore)}`
+                              : "Pending"
+                          }
                           color={getScoreColor(app.matchScore)}
                           size="small"
                           sx={{ fontWeight: 800, fontSize: "0.75rem" }}
@@ -473,66 +719,20 @@ function Ranking() {
         </Box>
       )}
 
-      {/* ── Leaderboard Table Card with Interactive Filters ── */}
+      {/* ── Leaderboard Table Card ── */}
       {selectedJobId !== "all" && (
-        <Card sx={{ borderRadius: "16px" }}>
+        <Card sx={{ borderRadius: "16px", border: "1px solid #E2E8F0" }}>
           <CardContent sx={{ p: 3 }}>
-            {/* Table Filter Controls */}
-            <Box
-              sx={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: { xs: "flex-start", sm: "center" },
-                flexWrap: "wrap",
-                gap: 2,
-                mb: 3,
-              }}
-            >
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
-                <Typography variant="subtitle2" fontWeight={700} color="text.secondary" sx={{ mr: 1 }}>
-                  Filter by Match:
-                </Typography>
-                {[
-                  { id: "all", label: "All Candidates" },
-                  { id: "80", label: "Top (80%+)" },
-                  { id: "60", label: "Qualified (60-79%)" },
-                  { id: "below60", label: "< 60%" },
-                ].map((chip) => (
-                  <Chip
-                    key={chip.id}
-                    label={chip.label}
-                    onClick={() => setScoreFilter(chip.id)}
-                    variant={scoreFilter === chip.id ? "filled" : "outlined"}
-                    color={scoreFilter === chip.id ? "primary" : "default"}
-                    sx={{ fontWeight: 600, fontSize: "0.75rem", cursor: "pointer" }}
-                  />
-                ))}
-              </Box>
-
-              <OutlinedInput
-                size="small"
-                placeholder="Search candidate or skill..."
-                value={candidateSearch}
-                onChange={(e) => setCandidateSearch(e.target.value)}
-                startAdornment={
-                  <InputAdornment position="start">
-                    <SearchIcon sx={{ color: "text.secondary", fontSize: 18 }} />
-                  </InputAdornment>
-                }
-                sx={{ minWidth: 240 }}
-              />
-            </Box>
-
             {/* Table */}
             <TableContainer component={Paper} elevation={0} sx={{ border: "1px solid #E2E8F0", borderRadius: "12px" }}>
               <Table size="small">
                 <TableHead>
-                  <TableRow>
+                  <TableRow sx={{ backgroundColor: "#F8FAFC" }}>
                     <TableCell sx={{ width: 80 }}><strong>Rank</strong></TableCell>
                     <TableCell><strong>Candidate</strong></TableCell>
                     <TableCell><strong>Email</strong></TableCell>
                     <TableCell><strong>Status</strong></TableCell>
-                    <TableCell sx={{ minWidth: 160 }}><strong>AI Match Score</strong></TableCell>
+                    <TableCell sx={{ minWidth: 180 }}><strong>AI Match Score</strong></TableCell>
                     <TableCell><strong>Experience</strong></TableCell>
                     <TableCell align="center"><strong>AI Breakdown</strong></TableCell>
                     <TableCell align="center"><strong>Re-analyze</strong></TableCell>
@@ -548,7 +748,7 @@ function Ranking() {
                           ))}
                         </TableRow>
                       ))
-                    : filteredRanked.length === 0
+                    : sortedRanked.length === 0
                     ? (
                         <TableRow>
                           <TableCell colSpan={8} align="center">
@@ -558,7 +758,7 @@ function Ranking() {
                           </TableCell>
                         </TableRow>
                       )
-                    : filteredRanked.map((app, idx) => (
+                    : sortedRanked.map((app, idx) => (
                         <TableRow key={app._id} hover>
                           <TableCell>
                             <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
@@ -601,6 +801,9 @@ function Ranking() {
                                   sx={{ flexGrow: 1, height: 6, borderRadius: 4 }}
                                   color={getScoreColor(app.matchScore)}
                                 />
+                                <Typography variant="caption" sx={{ fontWeight: 700, color: "text.secondary", minWidth: 50 }}>
+                                  {getScoreCategoryLabel(app.matchScore)}
+                                </Typography>
                               </Box>
                             ) : (
                               <Chip label="Pending Analysis" size="small" sx={{ bgcolor: "#F1F5F9" }} />
@@ -676,7 +879,7 @@ function Ranking() {
                 <Chip
                   label={
                     selectedCandidate.matchScore !== null
-                      ? `${selectedCandidate.matchScore}% Match`
+                      ? `${selectedCandidate.matchScore}% · ${getScoreCategoryLabel(selectedCandidate.matchScore)}`
                       : "Pending"
                   }
                   color={getScoreColor(selectedCandidate.matchScore)}
