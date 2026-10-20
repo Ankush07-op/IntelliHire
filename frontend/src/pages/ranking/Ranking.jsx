@@ -17,7 +17,6 @@ import {
   Grid,
   InputAdornment,
   InputLabel,
-  LinearProgress,
   MenuItem,
   OutlinedInput,
   Paper,
@@ -53,22 +52,10 @@ import {
   reanalyzeApplication,
 } from "../../services/applicationService";
 import { formatDate } from "../../utils/formatDate";
+import { clampScore, getMatchCategory, getScoreColor } from "../../utils/scoreUtils";
+import AIMatchProgressBar from "../../components/ai/AIMatchProgressBar";
 
 const MEDAL_COLORS = ["#F59E0B", "#94A3B8", "#D97706"];
-
-const getScoreColor = (score) => {
-  if (score === null || score === undefined) return "default";
-  if (score >= 80) return "success";
-  if (score >= 60) return "warning";
-  return "error";
-};
-
-const getScoreCategoryLabel = (score) => {
-  if (score === null || score === undefined) return "Pending";
-  if (score >= 80) return "Strong";
-  if (score >= 60) return "Medium";
-  return "Weak";
-};
 
 function Ranking() {
   const { user } = useAuth();
@@ -324,8 +311,8 @@ function Ranking() {
       `#${idx + 1}`,
       `"${(app.applicantId?.name || "Unknown").replace(/"/g, '""')}"`,
       `"${(app.applicantId?.email || "").replace(/"/g, '""')}"`,
-      app.matchScore ?? "Pending",
-      getScoreCategoryLabel(app.matchScore),
+      app.matchScore !== null ? `${clampScore(app.matchScore)}%` : "Pending",
+      getMatchCategory(app.matchScore).label,
       app.experienceYears ?? "N/A",
       `"${(app.matchedSkills || []).join(", ").replace(/"/g, '""')}"`,
       `"${(app.missingSkills || []).join(", ").replace(/"/g, '""')}"`,
@@ -658,7 +645,7 @@ function Ranking() {
                         <Chip
                           label={
                             app.matchScore !== null
-                              ? `${app.matchScore}% · ${getScoreCategoryLabel(app.matchScore)}`
+                              ? `${clampScore(app.matchScore)}% · ${getMatchCategory(app.matchScore).label}`
                               : "Pending"
                           }
                           color={getScoreColor(app.matchScore)}
@@ -674,17 +661,15 @@ function Ranking() {
                         {candidateEmail(app)}
                       </Typography>
 
-                      {/* Match Score Bar */}
-                      {app.matchScore !== null && (
-                        <Box sx={{ mb: 2 }}>
-                          <LinearProgress
-                            variant="determinate"
-                            value={app.matchScore}
-                            sx={{ height: 6, borderRadius: 3 }}
-                            color={getScoreColor(app.matchScore)}
-                          />
-                        </Box>
-                      )}
+                      {/* AI Match Score Progress Bar */}
+                      <AIMatchProgressBar
+                        score={app.matchScore}
+                        label="AI Match Score"
+                        showLabel={true}
+                        showCategory={false}
+                        height={6}
+                        sx={{ mb: 2 }}
+                      />
 
                       {/* Matched Skills Chips */}
                       {app.matchedSkills?.length > 0 && (
@@ -786,28 +771,13 @@ function Ranking() {
                             <Chip label={app.status} size="small" sx={{ fontWeight: 600, fontSize: "0.72rem" }} />
                           </TableCell>
 
-                          <TableCell>
-                            {app.matchScore !== null ? (
-                              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                                <Chip
-                                  label={`${app.matchScore}%`}
-                                  color={getScoreColor(app.matchScore)}
-                                  size="small"
-                                  sx={{ fontWeight: 700, minWidth: 50 }}
-                                />
-                                <LinearProgress
-                                  variant="determinate"
-                                  value={app.matchScore}
-                                  sx={{ flexGrow: 1, height: 6, borderRadius: 4 }}
-                                  color={getScoreColor(app.matchScore)}
-                                />
-                                <Typography variant="caption" sx={{ fontWeight: 700, color: "text.secondary", minWidth: 50 }}>
-                                  {getScoreCategoryLabel(app.matchScore)}
-                                </Typography>
-                              </Box>
-                            ) : (
-                              <Chip label="Pending Analysis" size="small" sx={{ bgcolor: "#F1F5F9" }} />
-                            )}
+                          <TableCell sx={{ minWidth: 180 }}>
+                            <AIMatchProgressBar
+                              score={app.matchScore}
+                              compact={true}
+                              showCategory={true}
+                              height={6}
+                            />
                           </TableCell>
 
                           <TableCell>
@@ -879,7 +849,7 @@ function Ranking() {
                 <Chip
                   label={
                     selectedCandidate.matchScore !== null
-                      ? `${selectedCandidate.matchScore}% · ${getScoreCategoryLabel(selectedCandidate.matchScore)}`
+                      ? `${clampScore(selectedCandidate.matchScore)}% · ${getMatchCategory(selectedCandidate.matchScore).label}`
                       : "Pending"
                   }
                   color={getScoreColor(selectedCandidate.matchScore)}
@@ -889,6 +859,17 @@ function Ranking() {
             </DialogTitle>
 
             <DialogContent dividers sx={{ p: 3 }}>
+              {/* Full-width Standardized AI Match Score Progress Bar */}
+              <Box sx={{ mb: 3, p: 2, bgcolor: "#F8FAFC", borderRadius: "14px", border: "1px solid #E2E8F0" }}>
+                <AIMatchProgressBar
+                  score={selectedCandidate.matchScore}
+                  label="Overall Candidate AI Match Score"
+                  showLabel={true}
+                  showCategory={true}
+                  height={8}
+                />
+              </Box>
+
               {/* AI Summary Box */}
               <Box sx={{ mb: 3, p: 2.5, bgcolor: "#F8FAFC", borderRadius: "14px", border: "1px solid #E2E8F0" }}>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>

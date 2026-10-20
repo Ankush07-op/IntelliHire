@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 
 import {
   Alert,
@@ -8,7 +8,6 @@ import {
   Card,
   CardContent,
   Chip,
-  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
@@ -27,17 +26,17 @@ import {
 import { useToast } from "../../context/ToastContext";
 
 import SearchIcon from "@mui/icons-material/Search";
-import PersonIcon from "@mui/icons-material/Person";
-import EmailIcon from "@mui/icons-material/Email";
-import EventAvailableIcon from "@mui/icons-material/EventAvailable";
 
 import { useAuth } from "../../context/useAuth";
 import { fetchJobs } from "../../services/jobService";
 import {
   fetchApplicationsByJob,
+  fetchJobRankings,
   updateApplicationStatus,
 } from "../../services/applicationService";
 import { formatDate } from "../../utils/formatDate";
+import { enrichApplicationsWithRankings } from "../../utils/scoreUtils";
+import AIMatchProgressBar from "../../components/ai/AIMatchProgressBar";
 
 // Pipeline columns — must match backend enum exactly
 const COLUMNS = [
@@ -98,34 +97,34 @@ function Kanban() {
   }, [user]);
 
   // ── Load applications when job is selected ─────────────────
-  useEffect(() => {
-    if (selectedJobId === "all") {
-      setApplications([]);
+  const loadJobApplications = useCallback(async (jobId) => {
+    if (jobId === "all") {
       return;
     }
 
-    let cancelled = false;
     setAppsLoading(true);
     setFetchError("");
 
-    fetchApplicationsByJob(selectedJobId)
-      .then((data) => {
-        if (!cancelled) {
-          setApplications(Array.isArray(data) ? data : []);
-          setAppsLoading(false);
-        }
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          setFetchError(err.response?.data?.message || "Failed to load candidates.");
-          setAppsLoading(false);
-        }
-      });
+    try {
+      const [data, rankings] = await Promise.all([
+        fetchApplicationsByJob(jobId),
+        fetchJobRankings(jobId).catch(() => ({ rankings: [] })),
+      ]);
+      const enriched = enrichApplicationsWithRankings(data, rankings);
+      setApplications(enriched);
+    } catch (err) {
+      setFetchError(err.response?.data?.message || "Failed to load candidates.");
+    } finally {
+      setAppsLoading(false);
+    }
+  }, []);
 
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedJobId]);
+  useEffect(() => {
+    async function run() {
+      await loadJobApplications(selectedJobId);
+    }
+    void run();
+  }, [selectedJobId, loadJobApplications]);
 
   // ── Move card to a new status column ──────────────────────
   const handleMoveCard = async (applicationId, newStatus, customDetails = null) => {
@@ -185,7 +184,8 @@ function Kanban() {
             Recruitment Kanban
           </Typography>
           <Typography variant="body1" color="text.secondary">
-            Visualize and transition candidates across your hiring pipeline stages.
+            Visualize and transition candidates across your hiring pipeline stages
+            {selectedJob ? ` for ${selectedJob.title}` : ""}.
           </Typography>
         </Box>
 
@@ -208,7 +208,13 @@ function Kanban() {
           <FormControl size="small" sx={{ minWidth: 240 }} disabled={jobsLoading}>
             <Select
               value={selectedJobId}
-              onChange={(e) => setSelectedJobId(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                setSelectedJobId(val);
+                if (val === "all") {
+                  setApplications([]);
+                }
+              }}
               displayEmpty
               sx={{ backgroundColor: "#FFF" }}
             >
@@ -346,7 +352,19 @@ function Kanban() {
                                   </Box>
                                 </Box>
 
-                                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mt: 1, mb: 1.5 }}>
+                                {/* AI Match Score Progress Bar */}
+                                <Box sx={{ mt: 1.25, mb: 1.25 }}>
+                                  <AIMatchProgressBar
+                                    score={app.matchScore}
+                                    label="AI Match"
+                                    showLabel={true}
+                                    showCategory={true}
+                                    compact={false}
+                                    height={5}
+                                  />
+                                </Box>
+
+                                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1.25 }}>
                                   <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.7rem" }}>
                                     Applied: {formatDate(app.createdAt)}
                                   </Typography>

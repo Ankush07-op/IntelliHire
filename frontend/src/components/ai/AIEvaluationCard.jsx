@@ -16,32 +16,13 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import TrendingUpIcon from "@mui/icons-material/TrendingUp";
+import { clampScore, getMatchCategory } from "../../utils/scoreUtils";
 
 const getRecommendation = (score) => {
-  if (score >= 85) {
-    return {
-      label: "Strong Match",
-      color: "success",
-    };
-  }
-
-  if (score >= 70) {
-    return {
-      label: "Good Match",
-      color: "info",
-    };
-  }
-
-  if (score >= 55) {
-    return {
-      label: "Moderate Match",
-      color: "warning",
-    };
-  }
-
+  const category = getMatchCategory(score);
   return {
-    label: "Low Match",
-    color: "error",
+    label: category.fullLabel,
+    color: category.color,
   };
 };
 
@@ -382,15 +363,25 @@ const AIEvaluationCard = ({
               <Typography
                 variant="h5"
                 fontWeight={800}
-                color="primary"
+                color={getRecommendation(score).color}
               >
-                {score}%
+                {clampScore(score) !== null ? `${clampScore(score)}%` : "Pending"}
               </Typography>
             </Box>
 
             <LinearProgress
               variant="determinate"
-              value={score}
+              value={clampScore(score) ?? 0}
+              color={getRecommendation(score).color}
+              aria-label="AI Overall Match Score"
+              aria-valuenow={clampScore(score) ?? 0}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuetext={
+                clampScore(score) !== null
+                  ? `Overall Match Score: ${clampScore(score)} percent`
+                  : "Overall Match Score: Pending analysis"
+              }
               sx={{
                 height: 10,
                 borderRadius: 5,
@@ -430,12 +421,16 @@ const AIEvaluationCard = ({
                 variant="h6"
                 fontWeight={700}
               >
-                {result.skillScore}%
+                {clampScore(result.skillScore) !== null ? `${clampScore(result.skillScore)}%` : "—"}
               </Typography>
 
               <LinearProgress
                 variant="determinate"
-                value={result.skillScore}
+                value={clampScore(result.skillScore) ?? 0}
+                aria-label="Skills Match Score"
+                aria-valuenow={clampScore(result.skillScore) ?? 0}
+                aria-valuemin={0}
+                aria-valuemax={100}
                 sx={{
                   mt: 1,
                   height: 6,
@@ -465,12 +460,16 @@ const AIEvaluationCard = ({
                 variant="h6"
                 fontWeight={700}
               >
-                {result.experienceMatch}%
+                {clampScore(result.experienceMatch) !== null ? `${clampScore(result.experienceMatch)}%` : "—"}
               </Typography>
 
               <LinearProgress
                 variant="determinate"
-                value={result.experienceMatch}
+                value={clampScore(result.experienceMatch) ?? 0}
+                aria-label="Experience Match Score"
+                aria-valuenow={clampScore(result.experienceMatch) ?? 0}
+                aria-valuemin={0}
+                aria-valuemax={100}
                 sx={{
                   mt: 1,
                   height: 6,

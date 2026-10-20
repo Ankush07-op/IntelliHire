@@ -11,7 +11,6 @@ import {
   Button,
   Avatar,
   Divider,
-  LinearProgress,
 } from "@mui/material";
 
 import WorkIcon from "@mui/icons-material/Work";
@@ -27,7 +26,12 @@ import PsychologyIcon from "@mui/icons-material/Psychology";
 
 import { useAuth } from "../../context/useAuth";
 import { fetchJobs } from "../../services/jobService";
-import { fetchApplicationsByJob } from "../../services/applicationService";
+import {
+  fetchApplicationsByJob,
+  fetchJobRankings,
+} from "../../services/applicationService";
+import { enrichApplicationsWithRankings } from "../../utils/scoreUtils";
+import AIMatchProgressBar from "../../components/ai/AIMatchProgressBar";
 
 // Helper for stage colors
 const STAGE_COLORS = {
@@ -144,12 +148,16 @@ function Dashboard() {
           .sort((a, b) => b[1] - a[1])
           .slice(0, 8);
 
-        // 3. Fetch applications for recruiter's active jobs
+        // 3. Fetch applications & AI rankings for recruiter's active jobs
         const appResults = await Promise.allSettled(
           activeJobs.map((job) =>
-            fetchApplicationsByJob(job._id).then((apps) =>
-              apps.map((app) => ({ ...app, jobTitle: job.title, jobId: job._id }))
-            )
+            Promise.all([
+              fetchApplicationsByJob(job._id),
+              fetchJobRankings(job._id).catch(() => ({ rankings: [] })),
+            ]).then(([apps, rankings]) => {
+              const enriched = enrichApplicationsWithRankings(apps, rankings);
+              return enriched.map((app) => ({ ...app, jobTitle: job.title, jobId: job._id }));
+            })
           )
         );
 
@@ -264,7 +272,7 @@ function Dashboard() {
           <Button
             variant="outlined"
             startIcon={<EmojiEventsIcon sx={{ fontSize: 18 }} />}
-            onClick={() => navigate("/ranking")}
+            onClick={() => navigate("/recruiter/ranking")}
             sx={{ fontWeight: 600 }}
           >
             AI Rankings
@@ -597,19 +605,28 @@ function Dashboard() {
                             </Box>
                           </Box>
 
-                          <Chip
-                            label={app.status}
-                            size="small"
-                            sx={{
-                              bgcolor: stageColor.bg,
-                              color: stageColor.main,
-                              border: `1px solid ${stageColor.border}`,
-                              fontWeight: 700,
-                              fontSize: "0.68rem",
-                              height: 22,
-                              shrink: 0,
-                            }}
-                          />
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, flexShrink: 0 }}>
+                            <Box sx={{ minWidth: 140, display: { xs: "none", sm: "block" } }}>
+                              <AIMatchProgressBar
+                                score={app.matchScore}
+                                compact={true}
+                                showCategory={true}
+                                height={6}
+                              />
+                            </Box>
+                            <Chip
+                              label={app.status}
+                              size="small"
+                              sx={{
+                                bgcolor: stageColor.bg,
+                                color: stageColor.main,
+                                border: `1px solid ${stageColor.border}`,
+                                fontWeight: 700,
+                                fontSize: "0.68rem",
+                                height: 22,
+                              }}
+                            />
+                          </Box>
                         </Box>
                       );
                     })}

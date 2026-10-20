@@ -41,12 +41,15 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import { fetchJobs } from "../../services/jobService";
 import {
   fetchApplicationsByJob,
+  fetchJobRankings,
   updateApplicationStatus,
   fetchResumeDownloadUrl,
   fetchApplicationAnalysis,
   reanalyzeApplication,
 } from "../../services/applicationService";
 import { useToast } from "../../context/ToastContext";
+import { enrichApplicationsWithRankings } from "../../utils/scoreUtils";
+import AIMatchProgressBar from "../../components/ai/AIMatchProgressBar";
 
 // Backend status enum (must match Application.js model)
 const PIPELINE_STATUSES = ["Applied", "Shortlisted", "Interview", "Offered", "Rejected"];
@@ -143,10 +146,14 @@ function Applications() {
 
     let isCurrent = true;
 
-    fetchApplicationsByJob(selectedJobId)
-      .then((data) => {
+    Promise.all([
+      fetchApplicationsByJob(selectedJobId),
+      fetchJobRankings(selectedJobId).catch(() => ({ rankings: [] })),
+    ])
+      .then(([apps, rankings]) => {
         if (isCurrent) {
-          setApplications(Array.isArray(data) ? data : []);
+          const enriched = enrichApplicationsWithRankings(apps, rankings);
+          setApplications(enriched);
           setAppsLoading(false);
         }
       })
@@ -379,6 +386,7 @@ function Applications() {
                     <TableCell><strong>Candidate</strong></TableCell>
                     <TableCell><strong>Email</strong></TableCell>
                     <TableCell><strong>Applied Date</strong></TableCell>
+                    <TableCell sx={{ minWidth: 170 }}><strong>AI Match Score</strong></TableCell>
                     <TableCell><strong>Status</strong></TableCell>
                     <TableCell><strong>Update Status</strong></TableCell>
                     <TableCell align="center"><strong>Actions</strong></TableCell>
@@ -389,7 +397,7 @@ function Applications() {
                   {appsLoading
                     ? [1, 2, 3].map((n) => (
                         <TableRow key={n}>
-                          {[1, 2, 3, 4, 5, 6].map((c) => (
+                          {[1, 2, 3, 4, 5, 6, 7].map((c) => (
                             <TableCell key={c}><Skeleton /></TableCell>
                           ))}
                         </TableRow>
@@ -397,7 +405,7 @@ function Applications() {
                     : applications.length === 0
                     ? (
                         <TableRow>
-                          <TableCell colSpan={6} align="center">
+                          <TableCell colSpan={7} align="center">
                             <Typography color="text.secondary" sx={{ py: 4 }}>
                               No applications found for this job.
                             </Typography>
@@ -413,6 +421,15 @@ function Applications() {
                           <TableCell>{candidateEmail(app)}</TableCell>
 
                           <TableCell>{formatDate(app.createdAt)}</TableCell>
+
+                          <TableCell sx={{ minWidth: 170 }}>
+                            <AIMatchProgressBar
+                              score={app.matchScore}
+                              compact={true}
+                              showCategory={true}
+                              height={6}
+                            />
+                          </TableCell>
 
                           <TableCell>
                             <Chip
@@ -499,39 +516,42 @@ function Applications() {
                 </Grid>
               </Grid>
 
-              {/* AI Analysis */}
+              {/* AI Evaluation */}
               <Typography variant="h6" fontWeight={600} sx={{ mb: 2 }}>
-                AI Analysis
+                AI Evaluation
               </Typography>
               {analysisLoading ? (
                 <Box sx={{ py: 2 }}>
                   <Skeleton variant="text" width="60%" />
+                  <Skeleton variant="rectangular" height={8} sx={{ my: 1, borderRadius: 1 }} />
                   <Skeleton variant="text" width="80%" />
-                  <Skeleton variant="text" width="50%" />
                 </Box>
               ) : analysis ? (
-                <Box sx={{ mb: 3, p: 2, bgcolor: "action.hover", borderRadius: 2 }}>
-                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                    <div>
-                      <Typography variant="body2" color="text.secondary">
-                        Match Score
-                      </Typography>
-                      <Typography variant="h4" fontWeight={700} color="primary">
-                        {analysis.score ?? analysis.matchScore ?? "—"}%
-                      </Typography>
-                    </div>
-                    {analysis.experienceYears !== undefined && analysis.experienceYears !== null && (
+                <Box sx={{ mb: 3, p: 2.5, bgcolor: "action.hover", borderRadius: 2 }}>
+                  {/* Standardized Full-Width AI Match Score Progress Bar */}
+                  <AIMatchProgressBar
+                    score={analysis.score ?? analysis.matchScore}
+                    label="AI Match Score"
+                    showLabel={true}
+                    showCategory={true}
+                    height={8}
+                    sx={{ mb: 2 }}
+                  />
+
+                  {analysis.experienceYears !== undefined && analysis.experienceYears !== null && (
+                    <Box sx={{ mb: 1.5 }}>
                       <Chip
                         size="small"
-                        label={`${analysis.experienceYears} yrs experience`}
+                        label={`${analysis.experienceYears} yrs relevant experience`}
                         color="info"
                         variant="outlined"
+                        sx={{ fontWeight: 600 }}
                       />
-                    )}
-                  </Box>
+                    </Box>
+                  )}
 
                   {analysis.summary && (
-                    <Typography variant="body2" sx={{ mt: 1.5, color: "text.primary" }}>
+                    <Typography variant="body2" sx={{ mt: 1, color: "text.primary", lineHeight: 1.6 }}>
                       {analysis.summary}
                     </Typography>
                   )}
