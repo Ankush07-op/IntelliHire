@@ -1,4 +1,4 @@
-﻿
+
 import os
 import tempfile
 from pathlib import Path
@@ -17,7 +17,7 @@ import urllib.error
 import uuid
 from typing import Optional
 from pydantic import BaseModel
-from llm_matcher import analyze_match
+from app.llm_matcher import analyze_match
 
 app = FastAPI(
     title="IntelliHire AI Service",
